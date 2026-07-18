@@ -147,7 +147,7 @@ function CustomersPage() {
                         <div className="flex gap-1 flex-wrap">
                           {cMeters.map((m) => (
                             <Badge key={m.id} variant="outline" className="gap-1">
-                              {m.type === "water" ? <Droplets className="w-3 h-3 text-water" /> : <Zap className="w-3 h-3 text-electric" />}
+                              <Droplets className="w-3 h-3 text-water" />
                               {m.number}
                             </Badge>
                           ))}
