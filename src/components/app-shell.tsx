@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, ClipboardList, Receipt, Wallet, Droplets, Zap, LogOut, TrendingDown, ShieldCheck, Scale } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardList, Receipt, Wallet, Droplets, LogOut, TrendingDown, ShieldCheck, Scale } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth, ROLE_LABEL, canAccess, defaultRouteFor, type Role } from "@/lib/auth";
