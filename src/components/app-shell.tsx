@@ -78,9 +78,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-l border-sidebar-border">
         <div className="px-5 py-6 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="relative w-9 h-9 rounded-xl grid place-items-center" style={{ background: "linear-gradient(135deg, var(--water) 0%, var(--electric-2) 100%)" }}>
-              <Droplets className="w-4 h-4 text-white absolute -translate-x-1" />
-              <Zap className="w-4 h-4 text-white absolute translate-x-1.5 translate-y-1" />
+            <div className="relative w-9 h-9 rounded-xl grid place-items-center" style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}>
+              <Droplets className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="text-lg font-bold tracking-tight">ميزان</div>
