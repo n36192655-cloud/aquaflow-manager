@@ -250,7 +250,7 @@ function PrintDialog({ id, onClose }: { id: number; onClose: () => void }) {
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>الإجمالي</span>
-              <span style={{ color: m?.type === "water" ? "var(--water)" : "var(--electric-2)" }}>{fmtYER(b.total)}</span>
+              <span style={{ color: "var(--water)" }}>{fmtYER(b.total)}</span>
             </div>
           </div>
           <div className="mt-3 text-center text-xs text-slate-500">شكراً لالتزامكم بالسداد</div>
