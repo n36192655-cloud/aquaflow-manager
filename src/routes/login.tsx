@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth, type Role, ROLE_LABEL, defaultRouteFor } from "@/lib/auth";
 import { useLicense, statusLabel } from "@/lib/license";
 import { CopyrightFooter } from "@/components/footer";
-import { Droplets, Zap, ShieldCheck, Camera, Wallet } from "lucide-react";
+import { Droplets, ShieldCheck, Camera, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
