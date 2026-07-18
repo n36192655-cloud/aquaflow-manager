@@ -43,22 +43,26 @@ function SubscriptionPage() {
     toast.success("🔐 تم تفعيل صلاحيات الإدارة السحابية الموحدة");
   }
 
-  // ميزة الإيقاف الفوري عن بعد لجميع الأجهزة الثلاثة بكبسة زر واحدة من عندك
+  // Toggles the tenant subscription between active and suspended (super-admin only).
   async function toggleRemoteBilling() {
     try {
-      const nextState = !lic.billingPaid;
+      const nextStatus = lic.billingPaid ? "suspended" : "active";
       const { error } = await supabase
-        .from("client_licenses")
-        .update({ billing_paid: nextState })
-        .eq("tenant_id", lic.tenantId);
+        .from("tenants")
+        .update({ subscription_status: nextStatus })
+        .eq("id", lic.tenantId);
 
       if (error) throw error;
-      
+
       await lic.validateRemote();
-      toast.success(nextState ? "تم تنشيط رخصة العميل سحابياً" : "🛑 تم تعطيل وإيقاف النظام فوراً عن كافة الأجهزة المتصلة");
+      toast.success(
+        nextStatus === "active"
+          ? "تم تنشيط اشتراك المشروع سحابياً"
+          : "🛑 تم تعليق الاشتراك فوراً — سيتم قفل الأجهزة المتصلة",
+      );
       window.location.reload();
     } catch {
-      toast.error("فشل تعديل الحالة السحابية، يرجى التحقق من اتصال الإنترنت.");
+      toast.error("فشل تعديل الحالة السحابية — تحقق من اتصال الإنترنت.");
     }
   }
 
