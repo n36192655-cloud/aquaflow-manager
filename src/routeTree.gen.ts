@@ -9,8 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SubscriptionRouteImport } from './routes/subscription'
+import { Route as ReadingsRouteImport } from './routes/readings'
+import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as LossAnalysisRouteImport } from './routes/loss-analysis'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as BillsRouteImport } from './routes/bills'
+import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SubscriptionRoute = SubscriptionRouteImport.update({
+  id: '/subscription',
+  path: '/subscription',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingsRoute = ReadingsRouteImport.update({
+  id: '/readings',
+  path: '/readings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LossAnalysisRoute = LossAnalysisRouteImport.update({
+  id: '/loss-analysis',
+  path: '/loss-analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BillsRoute = BillsRouteImport.update({
+  id: '/bills',
+  path: '/bills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +67,144 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/bills': typeof BillsRoute
+  '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
+  '/loss-analysis': typeof LossAnalysisRoute
+  '/payments': typeof PaymentsRoute
+  '/readings': typeof ReadingsRoute
+  '/subscription': typeof SubscriptionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/bills': typeof BillsRoute
+  '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
+  '/loss-analysis': typeof LossAnalysisRoute
+  '/payments': typeof PaymentsRoute
+  '/readings': typeof ReadingsRoute
+  '/subscription': typeof SubscriptionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/bills': typeof BillsRoute
+  '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
+  '/loss-analysis': typeof LossAnalysisRoute
+  '/payments': typeof PaymentsRoute
+  '/readings': typeof ReadingsRoute
+  '/subscription': typeof SubscriptionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/assistant'
+    | '/bills'
+    | '/customers'
+    | '/login'
+    | '/loss-analysis'
+    | '/payments'
+    | '/readings'
+    | '/subscription'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/assistant'
+    | '/bills'
+    | '/customers'
+    | '/login'
+    | '/loss-analysis'
+    | '/payments'
+    | '/readings'
+    | '/subscription'
+  id:
+    | '__root__'
+    | '/'
+    | '/assistant'
+    | '/bills'
+    | '/customers'
+    | '/login'
+    | '/loss-analysis'
+    | '/payments'
+    | '/readings'
+    | '/subscription'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssistantRoute: typeof AssistantRoute
+  BillsRoute: typeof BillsRoute
+  CustomersRoute: typeof CustomersRoute
+  LoginRoute: typeof LoginRoute
+  LossAnalysisRoute: typeof LossAnalysisRoute
+  PaymentsRoute: typeof PaymentsRoute
+  ReadingsRoute: typeof ReadingsRoute
+  SubscriptionRoute: typeof SubscriptionRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/subscription': {
+      id: '/subscription'
+      path: '/subscription'
+      fullPath: '/subscription'
+      preLoaderRoute: typeof SubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/readings': {
+      id: '/readings'
+      path: '/readings'
+      fullPath: '/readings'
+      preLoaderRoute: typeof ReadingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loss-analysis': {
+      id: '/loss-analysis'
+      path: '/loss-analysis'
+      fullPath: '/loss-analysis'
+      preLoaderRoute: typeof LossAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bills': {
+      id: '/bills'
+      path: '/bills'
+      fullPath: '/bills'
+      preLoaderRoute: typeof BillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +217,15 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssistantRoute: AssistantRoute,
+  BillsRoute: BillsRoute,
+  CustomersRoute: CustomersRoute,
+  LoginRoute: LoginRoute,
+  LossAnalysisRoute: LossAnalysisRoute,
+  PaymentsRoute: PaymentsRoute,
+  ReadingsRoute: ReadingsRoute,
+  SubscriptionRoute: SubscriptionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
