@@ -373,6 +373,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_tenant: {
+        Args: {
+          _days?: number
+          _license_key: string
+          _max_seats: number
+          _tenant_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          subscription_expires_at: string | null
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_tenant_id: { Args: never; Returns: string }
       has_role: {
         Args: {
