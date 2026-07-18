@@ -161,7 +161,7 @@ function SubscriptionGuard({ children }: { children: ReactNode }) {
           .from("user_roles")
           .select("role")
           .eq("user_id", userData.user.id);
-        if ((roles ?? []).some((r) => r.role === "super_admin")) {
+        if ((roles ?? []).some((r: { role: string }) => r.role === "super_admin")) {
           if (alive) setState("ok");
           return;
         }
