@@ -241,7 +241,7 @@ function PrintDialog({ id, onClose }: { id: number; onClose: () => void }) {
             <div><div className="text-slate-500 text-xs">رقم العداد</div><div className="font-mono">{m?.number}</div></div>
             <div><div className="text-slate-500 text-xs">القراءة السابقة</div><div>{r?.previous}</div></div>
             <div><div className="text-slate-500 text-xs">القراءة الحالية</div><div>{r?.current}</div></div>
-            <div className="col-span-2"><div className="text-slate-500 text-xs">الاستهلاك</div><div className="font-semibold">{r?.consumption} {m?.type === "water" ? "م³" : "ك.و.س"}</div></div>
+            <div className="col-span-2"><div className="text-slate-500 text-xs">الاستهلاك</div><div className="font-semibold">{r?.consumption} م³</div></div>
           </div>
           <div className="mt-4 pt-4 border-t space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-slate-500">استهلاك الشهر</span><span>{fmtYER(b.subtotal)}</span></div>
