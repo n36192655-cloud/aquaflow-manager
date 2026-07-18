@@ -7,10 +7,13 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "@/components/ui/sonner";
+import { AppShell } from "@/components/app-shell";
+import { supabase } from "@/lib/supabase";
 
 function NotFoundComponent() {
   return (
@@ -77,14 +80,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "منصة ميزان — إدارة عدادات المياه" },
+      { name: "description", content: "نظام سحابي متعدد المستأجرين لإدارة مشاريع مياه اليمن: المشتركون، القراءات، الفواتير، التحصيل، وتحليل الفاقد." },
+      { name: "author", content: "MIZAN" },
+      { property: "og:title", content: "منصة ميزان — إدارة مشاريع المياه" },
+      { property: "og:description", content: "إدارة كاملة لعدادات وفواتير المياه في اليمن." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -92,6 +94,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -102,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <head>
         <HeadContent />
       </head>
@@ -119,8 +124,119 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <SubscriptionGuard>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </SubscriptionGuard>
+      <Toaster position="top-center" richColors />
     </QueryClientProvider>
+  );
+}
+
+/**
+ * Low-cost global subscription guard.
+ *
+ * Checks the current tenant's `subscription_status` and
+ * `subscription_expires_at` on mount + whenever the route changes.
+ * If the tenant is suspended or past expiration, the entire UI is
+ * intercepted and a lock screen is shown instead. Super-admins bypass
+ * the guard so the owner dashboard remains reachable.
+ */
+function SubscriptionGuard({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<"loading" | "ok" | "locked">("loading");
+  const [reason, setReason] = useState<"suspended" | "expired" | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) {
+          if (alive) setState("ok"); // Public routes (login) handle their own gating
+          return;
+        }
+        // Super admins are never locked out
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userData.user.id);
+        if ((roles ?? []).some((r: { role: string }) => r.role === "super_admin")) {
+          if (alive) setState("ok");
+          return;
+        }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        if (!profile?.tenant_id) {
+          if (alive) setState("ok");
+          return;
+        }
+        const { data: tenant } = await supabase
+          .from("tenants")
+          .select("subscription_status, subscription_expires_at")
+          .eq("id", profile.tenant_id)
+          .maybeSingle();
+        if (!tenant) {
+          if (alive) setState("ok");
+          return;
+        }
+        const expired =
+          tenant.subscription_expires_at &&
+          new Date(tenant.subscription_expires_at).getTime() < Date.now();
+        if (tenant.subscription_status === "suspended") {
+          if (alive) {
+            setReason("suspended");
+            setState("locked");
+          }
+          return;
+        }
+        if (tenant.subscription_status === "expired" || expired) {
+          if (alive) {
+            setReason("expired");
+            setState("locked");
+          }
+          return;
+        }
+        if (alive) setState("ok");
+      } catch {
+        if (alive) setState("ok");
+      }
+    };
+    void check();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (state === "loading") return null;
+  if (state === "locked") return <SubscriptionLockScreen reason={reason} />;
+  return <>{children}</>;
+}
+
+function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | null }) {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center bg-background px-4"
+      dir="rtl"
+    >
+      <div className="max-w-md text-center space-y-4">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 grid place-items-center">
+          <span className="text-3xl">🔒</span>
+        </div>
+        <h1 className="text-2xl font-bold text-foreground">
+          {reason === "expired" ? "انتهى الاشتراك" : "الاشتراك موقوف"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي.
+          يرجى التواصل مع مالك المنصة لتفعيل الاشتراك مرة أخرى.
+        </p>
+        <div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground">
+          Subscription Expired — Contact Platform Owner
+        </div>
+      </div>
+    </div>
   );
 }
