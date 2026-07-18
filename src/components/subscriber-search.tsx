@@ -83,11 +83,7 @@ export function SubscriberSearch({ value, onChange, placeholder }: Props) {
                   className="w-full text-right p-2.5 hover:bg-accent flex items-center gap-2 border-b last:border-b-0"
                   onClick={() => pick(m, c)}
                 >
-                  {m.type === "water" ? (
-                    <Droplets className="w-4 h-4 text-water shrink-0" />
-                  ) : (
-                    <Zap className="w-4 h-4 text-electric shrink-0" />
-                  )}
+                  <Droplets className="w-4 h-4 text-water shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{c?.name}</div>
                     <div className="text-[11px] text-muted-foreground font-mono">{m.number}</div>
