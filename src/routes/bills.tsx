@@ -74,7 +74,7 @@ function BillsPage() {
                     <TableCell className="font-medium">{c?.name}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 font-mono text-xs">
-                        {m?.type === "water" ? <Droplets className="w-3 h-3 text-water" /> : <Zap className="w-3 h-3 text-electric" />}
+                        <Droplets className="w-3 h-3 text-water" />
                         {m?.number}
                       </span>
                     </TableCell>
