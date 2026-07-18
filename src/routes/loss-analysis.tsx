@@ -5,20 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { AlertTriangle, Droplets, Zap, Trash2, Camera, TrendingDown } from "lucide-react";
+import { AlertTriangle, Droplets, Trash2, Camera, TrendingDown } from "lucide-react";
 import { fmtNum } from "@/lib/pricing";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import type { MeterType } from "@/lib/pricing";
 
 export const Route = createFileRoute("/loss-analysis")({
-  head: () => ({ meta: [{ title: "تحليل الفاقد — ميزان" }] }),
+  head: () => ({ meta: [{ title: "تحليل فاقد المياه — ميزان" }] }),
   component: LossAnalysisPage,
 });
 
-const LOSS_THRESHOLD = 15; // % — operational threshold
+const LOSS_THRESHOLD = 15; // %
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function monthAgoISO() {
@@ -28,7 +26,6 @@ function monthAgoISO() {
 
 function LossAnalysisPage() {
   const { productionLogs, addProductionLog, deleteProductionLog, readings, meters } = useStore();
-  const [type, setType] = useState<MeterType>("water");
   const [units, setUnits] = useState("");
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<string | undefined>(undefined);
@@ -48,7 +45,7 @@ function LossAnalysisPage() {
   function submit() {
     const n = Number(units);
     if (!n || n <= 0) return toast.error("أدخل قيمة إنتاج صحيحة");
-    addProductionLog({ type, units: n, note, photo, date: new Date().toISOString() });
+    addProductionLog({ type: "water", units: n, note, photo, date: new Date().toISOString() });
     setUnits(""); setNote(""); setPhoto(undefined);
     if (fileRef.current) fileRef.current.value = "";
     toast.success("تم تسجيل الإنتاج");
@@ -61,55 +58,39 @@ function LossAnalysisPage() {
       const t = new Date(d).getTime();
       return t >= fromT && t <= toT;
     };
-    const perType = (t: MeterType) => {
-      const produced = productionLogs.filter((p) => p.type === t && inRange(p.date)).reduce((a, b) => a + b.units, 0);
-      const metersOfType = new Set(meters.filter((m) => m.type === t).map((m) => m.id));
-      const consumed = readings.filter((r) => metersOfType.has(r.meter_id) && inRange(r.date)).reduce((a, b) => a + b.consumption, 0);
-      const loss = Math.max(0, produced - consumed);
-      const pct = produced > 0 ? (loss / produced) * 100 : 0;
-      return { produced, consumed, loss, pct };
-    };
-    return { water: perType("water"), electric: perType("electric") };
+    const waterMeters = new Set(meters.map((m) => m.id));
+    const produced = productionLogs.filter((p) => inRange(p.date)).reduce((a, b) => a + b.units, 0);
+    const consumed = readings.filter((r) => waterMeters.has(r.meter_id) && inRange(r.date)).reduce((a, b) => a + b.consumption, 0);
+    const loss = Math.max(0, produced - consumed);
+    const pct = produced > 0 ? (loss / produced) * 100 : 0;
+    return { produced, consumed, loss, pct };
   }, [productionLogs, readings, meters, from, to]);
 
   const chartData = [
-    { name: "المياه (م³)", produced: analytics.water.produced, consumed: analytics.water.consumed, loss: analytics.water.loss },
-    { name: "الكهرباء (ك.و.س)", produced: analytics.electric.produced, consumed: analytics.electric.consumed, loss: analytics.electric.loss },
+    { name: "المياه (م³)", produced: analytics.produced, consumed: analytics.consumed, loss: analytics.loss },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">تحليل الفاقد والتسرب</h1>
-        <p className="text-sm text-muted-foreground mt-1">قياس الفرق بين الإنتاج الكلي من المصدر واستهلاك المشتركين</p>
+        <h1 className="text-2xl md:text-3xl font-bold">تحليل فاقد المياه والتسرب</h1>
+        <p className="text-sm text-muted-foreground mt-1">قياس الفرق بين إنتاج المياه من المصدر واستهلاك المشتركين</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">تسجيل إنتاج جديد</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">تسجيل إنتاج مياه جديد</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>النوع</Label>
-                <Select value={type} onValueChange={(v: MeterType) => setType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="water">مياه (المضخة الرئيسية)</SelectItem>
-                    <SelectItem value="electric">كهرباء (المولّد الرئيسي)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>إجمالي الوحدات</Label>
-                <Input type="number" value={units} onChange={(e) => setUnits(e.target.value)} placeholder="مثال: 12500" />
-              </div>
+            <div>
+              <Label>إجمالي الوحدات (م³)</Label>
+              <Input type="number" value={units} onChange={(e) => setUnits(e.target.value)} placeholder="مثال: 12500" />
             </div>
             <div>
               <Label>ملاحظة</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثال: قراءة عداد المضخة الرئيسية بتاريخ..." />
             </div>
             <div>
-              <Label>تصوير العداد الرئيسي</Label>
+              <Label>تصوير العداد الرئيسي للمياه</Label>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onPickPhoto}
                 className="block w-full text-xs file:me-2 file:py-1.5 file:px-3 file:rounded-md file:border file:bg-muted file:text-foreground" />
               {photo && <img src={photo} alt="عداد رئيسي" className="mt-2 h-32 w-full object-cover rounded-lg border" />}
@@ -131,9 +112,8 @@ function LossAnalysisPage() {
                 <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <LossStat label="فاقد المياه" pct={analytics.water.pct} loss={analytics.water.loss} unit="م³" icon={<Droplets className="w-4 h-4" />} />
-              <LossStat label="فاقد الكهرباء" pct={analytics.electric.pct} loss={analytics.electric.loss} unit="ك.و.س" icon={<Zap className="w-4 h-4" />} />
+            <div className="pt-2">
+              <LossStat label="فاقد المياه" pct={analytics.pct} loss={analytics.loss} unit="م³" icon={<Droplets className="w-4 h-4" />} />
             </div>
           </CardContent>
         </Card>
@@ -150,22 +130,21 @@ function LossAnalysisPage() {
               <Tooltip formatter={(v: number) => fmtNum(v)} />
               <Legend />
               <Bar dataKey="produced" name="مُنتج" fill="var(--water)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="consumed" name="مُستهلك" fill="var(--electric-2)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="consumed" name="مُستهلك" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
               <Bar dataKey="loss" name="فاقد" fill="#dc2626" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {(analytics.water.pct > LOSS_THRESHOLD || analytics.electric.pct > LOSS_THRESHOLD) && (
+      {analytics.pct > LOSS_THRESHOLD && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div className="text-sm">
               <div className="font-semibold">تنبيه ذكي — نسبة الفاقد مرتفعة</div>
               <div className="text-muted-foreground mt-1">
-                {analytics.water.pct > LOSS_THRESHOLD && <div>فاقد المياه {analytics.water.pct.toFixed(1)}% — يوصى بفحص شبكة التوزيع لاحتمال وجود تسرب أو استهلاك غير مُقاس.</div>}
-                {analytics.electric.pct > LOSS_THRESHOLD && <div>فاقد الكهرباء {analytics.electric.pct.toFixed(1)}% — قد يشير إلى توصيلات غير قانونية أو خلل في العدادات.</div>}
+                فاقد المياه {analytics.pct.toFixed(1)}% — يوصى بفحص شبكة التوزيع لاحتمال وجود تسرب أو استهلاك غير مُقاس.
               </div>
             </div>
           </CardContent>
@@ -183,8 +162,8 @@ function LossAnalysisPage() {
                 {p.photo ? <img src={p.photo} alt="" className="w-12 h-12 object-cover rounded" /> : <div className="w-12 h-12 bg-muted rounded grid place-items-center"><TrendingDown className="w-4 h-4 text-muted-foreground" /></div>}
                 <div className="flex-1 text-sm">
                   <div className="flex items-center gap-2">
-                    <Badge variant={p.type === "water" ? "default" : "secondary"}>{p.type === "water" ? "مياه" : "كهرباء"}</Badge>
-                    <span className="font-semibold">{fmtNum(p.units)}</span>
+                    <Badge>مياه</Badge>
+                    <span className="font-semibold">{fmtNum(p.units)} م³</span>
                     <span className="text-xs text-muted-foreground">{new Date(p.date).toLocaleString("ar")}</span>
                   </div>
                   {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
