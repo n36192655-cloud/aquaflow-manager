@@ -230,8 +230,8 @@ function PrintDialog({ id, onClose }: { id: number; onClose: () => void }) {
         <DialogHeader><DialogTitle>{b.serial}</DialogTitle></DialogHeader>
         <div id="printable" className="p-6 bg-white text-slate-900 rounded-lg border">
           <div className="text-center border-b pb-3 mb-4">
-            <div className="text-2xl font-bold" style={{ color: m?.type === "water" ? "var(--water)" : "var(--electric-2)" }}>ميزان</div>
-            <div className="text-xs text-slate-500 mt-1">فاتورة {m?.type === "water" ? "مياه" : "كهرباء"} — تعز، اليمن</div>
+            <div className="text-2xl font-bold" style={{ color: "var(--water)" }}>ميزان</div>
+            <div className="text-xs text-slate-500 mt-1">فاتورة مياه — تعز، اليمن</div>
             <div className="text-xs font-mono mt-1">{b.serial}</div>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
