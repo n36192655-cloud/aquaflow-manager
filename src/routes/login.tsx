@@ -41,14 +41,11 @@ function LoginPage() {
       <div className="flex-1 grid place-items-center px-4 py-10">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2" style={{ background: "linear-gradient(135deg, var(--water) 0%, var(--electric-2) 100%)" }}>
-              <div className="relative w-7 h-7">
-                <Droplets className="w-5 h-5 text-white absolute -translate-x-1" />
-                <Zap className="w-5 h-5 text-white absolute translate-x-1.5 translate-y-1" />
-              </div>
+            <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2" style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}>
+              <Droplets className="w-7 h-7 text-white" />
             </div>
             <CardTitle className="text-2xl">منصة ميزان</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">إدارة المياه والكهرباء — تعز، اليمن</p>
+            <p className="text-xs text-muted-foreground mt-1">إدارة مشاريع المياه — تعز، اليمن</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
