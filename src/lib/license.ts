@@ -142,17 +142,27 @@ export const useLicense = create<LicenseState>()(
         }
       },
 
-      activateRemote: async (tenantId, _licenseKey, maxSeats) => {
+      activateRemote: async (tenantId, licenseKey, maxSeats) => {
         try {
-          const { error } = await supabase
-            .from("tenants")
-            .update({ subscription_status: "active" })
-            .eq("id", tenantId);
+          const { data, error } = await supabase.rpc("activate_tenant", {
+            _tenant_id: tenantId,
+            _license_key: licenseKey,
+            _max_seats: maxSeats,
+            _days: 365,
+          });
           if (error) throw error;
-          set({ tenantId, maxSeats, billingPaid: true, initialized: true });
+          const row: any = Array.isArray(data) ? data[0] : data;
+          set({
+            tenantId: row?.id ?? tenantId,
+            licenseKey,
+            maxSeats,
+            billingPaid: true,
+            expiresAt: row?.subscription_expires_at ?? "",
+            initialized: true,
+          });
           return true;
         } catch (err) {
-          console.error(err);
+          console.error("[activateRemote]", err);
           return false;
         }
       },
