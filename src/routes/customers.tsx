@@ -100,21 +100,9 @@ function CustomersPage() {
                 <Label>العنوان التفصيلي *</Label>
                 <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="الحارة، الشارع، أقرب معلم…" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>نوع العداد *</Label>
-                  <Select value={form.meterType} onValueChange={(v: MeterType) => setForm({ ...form, meterType: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="water">مياه</SelectItem>
-                      <SelectItem value="electric">كهرباء</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>رقم العداد الجديد *</Label>
-                  <Input dir="ltr" value={form.meterNumber} onChange={(e) => setForm({ ...form, meterNumber: e.target.value })} placeholder="مثال: W-1042" />
-                </div>
+              <div>
+                <Label>رقم عداد المياه الجديد *</Label>
+                <Input dir="ltr" value={form.meterNumber} onChange={(e) => setForm({ ...form, meterNumber: e.target.value })} placeholder="مثال: W-1042" />
               </div>
             </div>
             <DialogFooter>
