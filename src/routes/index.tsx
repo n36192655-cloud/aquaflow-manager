@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
 import { fmtYER, fmtNum } from "@/lib/pricing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Droplets, Zap, Users, AlertTriangle, Receipt, TrendingUp } from "lucide-react";
+import { Droplets, Users, AlertTriangle, Receipt, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, Legend } from "recharts";
 
@@ -16,24 +16,18 @@ function Dashboard() {
   const totalRevenue = payments.reduce((a, b) => a + b.amount, 0) + paid.reduce((a, b) => a + b.total, 0);
   const outstanding = unpaid.reduce((a, b) => a + b.total, 0);
 
-  const waterMeters = meters.filter((m) => m.type === "water");
-  const elecMeters = meters.filter((m) => m.type === "electric");
-  const waterCons = readings.filter((r) => waterMeters.some((m) => m.id === r.meter_id)).reduce((a, b) => a + b.consumption, 0);
-  const elecCons = readings.filter((r) => elecMeters.some((m) => m.id === r.meter_id)).reduce((a, b) => a + b.consumption, 0);
-
+  const waterCons = readings.reduce((a, b) => a + b.consumption, 0);
   const suspicious = readings.filter((r) => r.flag !== "ok");
 
   const byMeter = new Map<number, number>();
   readings.forEach((r) => {
-    const prev = byMeter.get(r.meter_id) ?? 0;
-    byMeter.set(r.meter_id, prev + r.consumption);
+    byMeter.set(r.meter_id, (byMeter.get(r.meter_id) ?? 0) + r.consumption);
   });
   const chartData = meters.slice(0, 10).map((m) => {
     const c = customers.find((c) => c.id === m.customer_id);
     return {
       name: c?.name.split(" ")[0] ?? m.number,
-      water: m.type === "water" ? byMeter.get(m.id) ?? 0 : 0,
-      electric: m.type === "electric" ? byMeter.get(m.id) ?? 0 : 0,
+      water: byMeter.get(m.id) ?? 0,
     };
   });
 
@@ -46,20 +40,20 @@ function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">لوحة التحكم</h1>
-        <p className="text-sm text-muted-foreground mt-1">نظرة شاملة على شبكة المياه والكهرباء — تعز</p>
+        <p className="text-sm text-muted-foreground mt-1">نظرة شاملة على شبكة المياه — تعز</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="إجمالي الإيرادات" value={fmtYER(totalRevenue)} icon={<TrendingUp className="w-5 h-5" />} accent="water" />
-        <StatCard title="مستحقات غير محصلة" value={fmtYER(outstanding)} icon={<Receipt className="w-5 h-5" />} accent="electric" />
-        <StatCard title="استهلاك المياه" value={`${fmtNum(waterCons)} م³`} icon={<Droplets className="w-5 h-5" />} accent="water" />
-        <StatCard title="استهلاك الكهرباء" value={`${fmtNum(elecCons)} ك.و.س`} icon={<Zap className="w-5 h-5" />} accent="electric" />
+        <StatCard title="إجمالي الإيرادات" value={fmtYER(totalRevenue)} icon={<TrendingUp className="w-5 h-5" />} />
+        <StatCard title="مستحقات غير محصلة" value={fmtYER(outstanding)} icon={<Receipt className="w-5 h-5" />} />
+        <StatCard title="استهلاك المياه" value={`${fmtNum(waterCons)} م³`} icon={<Droplets className="w-5 h-5" />} />
+        <StatCard title="مشتركون" value={fmtNum(customers.length)} icon={<Users className="w-5 h-5" />} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MiniCard label="مشتركون" value={customers.length} icon={<Users className="w-4 h-4" />} />
         <MiniCard label="عدادات نشطة" value={meters.filter((m) => m.status === "active").length} icon={<Droplets className="w-4 h-4" />} />
         <MiniCard label="فواتير" value={bills.length} icon={<Receipt className="w-4 h-4" />} />
+        <MiniCard label="مدفوعات" value={payments.length} icon={<TrendingUp className="w-4 h-4" />} />
         <MiniCard label="تنبيهات" value={suspicious.length} icon={<AlertTriangle className="w-4 h-4" />} highlight={suspicious.length > 0} />
       </div>
 
@@ -74,8 +68,7 @@ function Dashboard() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="water" name="مياه" fill="var(--water)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="electric" name="كهرباء" fill="var(--electric-2)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="water" name="مياه (م³)" fill="var(--water)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -88,7 +81,7 @@ function Dashboard() {
               <PieChart>
                 <Pie data={revPie} dataKey="value" innerRadius={55} outerRadius={90} paddingAngle={2}>
                   <Cell fill="var(--water)" />
-                  <Cell fill="var(--electric-2)" />
+                  <Cell fill="var(--muted-foreground)" />
                 </Pie>
                 <Tooltip formatter={(v: number) => fmtYER(v)} />
                 <Legend />
@@ -105,7 +98,7 @@ function Dashboard() {
         </CardHeader>
         <CardContent>
           {suspicious.length === 0 ? (
-            <p className="text-sm text-muted-foreground">لا توجد قراءات شاذة حالياً. النظام يراقب الاستهلاك تلقائياً ويكشف: التسرب، التلاعب، والقفزات غير الطبيعية (أكثر من 3× المتوسط).</p>
+            <p className="text-sm text-muted-foreground">لا توجد قراءات شاذة حالياً. النظام يراقب استهلاك المياه تلقائياً ويكشف: التسرب، التلاعب، والقفزات غير الطبيعية (أكثر من 3× المتوسط).</p>
           ) : (
             <ul className="space-y-2">
               {suspicious.slice(0, 10).map((r) => {
@@ -130,9 +123,7 @@ function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon, accent }: { title: string; value: string; icon: React.ReactNode; accent: "water" | "electric" }) {
-  const bg = accent === "water" ? "var(--water-soft)" : "var(--electric-soft)";
-  const fg = accent === "water" ? "var(--water)" : "var(--electric-2)";
+function StatCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-5">
@@ -141,7 +132,7 @@ function StatCard({ title, value, icon, accent }: { title: string; value: string
             <div className="text-xs text-muted-foreground">{title}</div>
             <div className="mt-2 text-xl md:text-2xl font-bold">{value}</div>
           </div>
-          <div className="w-10 h-10 rounded-lg grid place-items-center" style={{ background: bg, color: fg }}>{icon}</div>
+          <div className="w-10 h-10 rounded-lg grid place-items-center" style={{ background: "var(--water-soft)", color: "var(--water)" }}>{icon}</div>
         </div>
       </CardContent>
     </Card>
