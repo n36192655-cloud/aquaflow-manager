@@ -22,12 +22,13 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   loginError: LicenseStatus | "bad_credentials" | null;
-  login: (name: string, role: Role, password: string) => boolean;
+  login: (name: string, role: Role, password: string) => Promise<boolean>;
   loginWithSupabase: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   heartbeat: () => void;
   hydrateFromSupabase: () => Promise<void>;
 }
+
 
 // Offline-only demo credentials used when the app runs without a Supabase session
 const DEMO_PASSWORD = "1234";
@@ -38,21 +39,36 @@ export const useAuth = create<AuthState>()(
       user: null,
       loginError: null,
 
-      login: (name, role, password) => {
+      login: async (name, role, password) => {
         if (password !== DEMO_PASSWORD || !name.trim()) {
           set({ loginError: "bad_credentials" });
           return false;
         }
+        const username = name.trim();
         const lic = useLicense.getState();
         lic.initIfNeeded();
-        const res = lic.acquireSeat(name.trim(), role);
+        const res = lic.acquireSeat(username, role);
         if (!res.ok) {
           set({ loginError: res.reason ?? "invalid" });
           return false;
         }
-        set({ user: { name: name.trim(), role, seatId: res.seatId }, loginError: null });
+        set({ user: { name: username, role, seatId: res.seatId }, loginError: null });
+
+        // Best-effort: also establish a Supabase session so auth.uid() is set
+        // (needed for super_admin gate, tenant RPCs, and RLS). Failure is
+        // non-fatal — offline demo login still works for meter readers.
+        try {
+          const email = `${username.toLowerCase()}@mizan.local`;
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (!error) {
+            await useAuth.getState().hydrateFromSupabase();
+          }
+        } catch {
+          // ignore — offline mode
+        }
         return true;
       },
+
 
       loginWithSupabase: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });

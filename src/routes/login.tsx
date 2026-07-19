@@ -84,8 +84,8 @@ function LoginPage() {
               <p className="text-[10px] text-muted-foreground mt-1">النظام يعمل بدون إنترنت — كلمة المرور التجريبية: 1234</p>
             </div>
 
-            <Button className="w-full" size="lg" onClick={() => {
-              const ok = login(name, role, password);
+            <Button className="w-full" size="lg" onClick={async () => {
+              const ok = await login(name, role, password);
               if (!ok) {
                 const err = (useAuth.getState() as { loginError: string | null }).loginError;
                 if (err === "seat_limit") return toast.error("تم بلوغ الحد الأقصى للمستخدمين المتزامنين لهذه المؤسسة");
@@ -94,8 +94,10 @@ function LoginPage() {
                 return toast.error("بيانات غير صحيحة");
               }
               toast.success(`مرحباً ${name} — ${ROLE_LABEL[role]}`);
-              navigate({ to: defaultRouteFor(role), replace: true });
+              const isSuper = (useAuth.getState() as { user: { isSuperAdmin?: boolean } | null }).user?.isSuperAdmin;
+              navigate({ to: isSuper ? "/super-admin" : defaultRouteFor(role), replace: true });
             }}>
+
               دخول
             </Button>
             {mounted && licStatus !== "active" && (
