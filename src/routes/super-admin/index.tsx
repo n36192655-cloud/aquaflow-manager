@@ -34,13 +34,32 @@ function SuperAdminDashboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // TEMP BYPASS: auth guard disabled to allow initial owner setup.
-    // TODO: re-enable super_admin role check after first tenant is activated.
-    setAllowed(true);
-    setChecking(false);
-    void refresh();
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) {
+        setAllowed(false);
+        setChecking(false);
+        navigate({ to: "/login" });
+        return;
+      }
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid);
+      const ok = (roles ?? []).some((r) => r.role === "super_admin");
+      setAllowed(ok);
+      setChecking(false);
+      if (!ok) {
+        toast.error("هذه الصفحة مخصّصة لمالك المنصة فقط");
+        navigate({ to: "/" });
+        return;
+      }
+      void refresh();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   async function refresh() {
     setLoading(true);
