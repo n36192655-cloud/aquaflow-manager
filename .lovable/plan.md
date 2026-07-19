@@ -1,90 +1,80 @@
+## Goal
+Grant `super_admin` in `user_roles` to the username **mofeed2020** so the owner dashboard, subscription guard, and tenant activation RPCs all recognise you as the platform owner.
 
-# ترقية شاملة لمنصة MIZAN
+## Why a plain INSERT is not enough
+`public.user_roles.user_id` is a foreign key to `auth.users(id)`. The current login screen is offline-only (username + demo password `1234`, stored in Zustand) and never creates a Supabase auth user, so:
+- `auth.users` is empty (confirmed by query).
+- No `user_id` exists to insert into `user_roles`.
+- `/super-admin`, `activate_tenant` RPC, and every RLS policy that calls `has_role(auth.uid(), 'super_admin')` will keep failing until a real signed-in session exists.
 
-كل التغييرات محلية (Zustand + localStorage). لا حاجة لأي backend.
+We need to (a) create a real auth user tied to the username `mofeed2020`, (b) insert its `user_roles` row as `super_admin`, and (c) make the existing username login actually sign that user into Supabase so `auth.uid()` is populated.
 
-## 1) الشريط الجانبي والمشتركون الموحّدون (Admin فقط)
+## Plan
 
-- حذف عناصر التنقل «العدادات» و«طلبات الميدان» من `app-shell.tsx` وإزالة الأيقونات المرتبطة، وحذف الملفات:
-  - `src/routes/meters.tsx`
-  - `src/routes/pending-requests.tsx`
-- إعادة تصميم `src/routes/customers.tsx` كواجهة موحّدة «المشتركون» تعرض في كل صف: الاسم، الهاتف، المديرية، العنوان التفصيلي، رقم/نوع العداد، والحساب البنكي.
-- زر «مشترك جديد» يفتح نموذجاً واحداً يجمع: الاسم، الهاتف، المديرية (Select من قائمة مديريات تعز مع خيار «أخرى»)، العنوان التفصيلي، نوع العداد (مياه/كهرباء)، ورقم العداد الجديد.
-- حفظ الإدخال يستدعي إجراء `adminCreateSubscriber` جديداً في المخزن يُنشئ المشترك + العداد مباشرة بحالة `active` (بدون خطوة اعتماد ميدانية).
-- إزالة `addPendingSubscriber` / `approveSubscriber` / `rejectSubscriber` من الاستدعاءات في الواجهات (تبقى في المخزن لأغراض الترحيل فقط أو تُحذف تماماً)، وحذف أي زر «تسجيل مشترك» من واجهة القارئ.
+### 1. Migration — seed the super_admin
+Runs inside a single security-definer block so we can call Supabase's admin API paths via SQL:
 
-## 2) واجهة القارئ الميداني + حماية القراءة بالذكاء الاصطناعي
+```sql
+-- Create the auth user for username "mofeed2020" if missing.
+-- We map username -> deterministic email so the demo login can sign in.
+DO $$
+DECLARE
+  v_email text := 'mofeed2020@mizan.local';
+  v_uid uuid;
+BEGIN
+  SELECT id INTO v_uid FROM auth.users WHERE email = v_email;
 
-في `src/routes/readings.tsx`:
+  IF v_uid IS NULL THEN
+    v_uid := extensions.uuid_generate_v4();
+    INSERT INTO auth.users
+      (id, instance_id, aud, role, email, encrypted_password,
+       email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+       created_at, updated_at)
+    VALUES
+      (v_uid, '00000000-0000-0000-0000-000000000000', 'authenticated',
+       'authenticated', v_email, crypt('1234', gen_salt('bf')),
+       now(), '{"provider":"email","providers":["email"]}'::jsonb,
+       jsonb_build_object('display_name','mofeed2020'),
+       now(), now());
+    INSERT INTO auth.identities
+      (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
+    VALUES
+      (extensions.uuid_generate_v4(), v_uid, v_uid::text,
+       jsonb_build_object('sub', v_uid::text, 'email', v_email),
+       'email', now(), now(), now());
+  END IF;
 
-- استبدال قائمة العدادات المنسدلة بشريط بحث ذكي (Command/Input) يطابق الاسم أو أول حروفه أو رقم العداد. اختيار نتيجة يعرض بطاقة تحتوي: الاسم الأول والثاني، رقم العداد المرتبط، القراءة السابقة الثابتة.
-- التقاط الصورة عبر `MeterCamera` يمرّ بتحقّق مزدوج:
-  1. **مطابقة OCR**: بعد استخراج `res.serial` + الأرقام، إذا كان مشترك محدَّد ولم يتطابق رقم العداد المُستخرَج مع الرقم المسجل → رفض الإدخال مع تحذير `toast.error` واضح ومنع الحفظ.
-  2. **إحداثيات GPS**: قبل حفظ القراءة، طلب `navigator.geolocation.getCurrentPosition` وتخزين `lat`/`lng`/`accuracy` مع القراءة. عدم القدرة على القراءة → تحذير ومنع الحفظ (مع سماح للأدمن بتجاوزه في وضع الاختبار).
-- إضافة الحقول التالية إلى `Reading` في `store.ts`: `photo?: string`, `ocr_serial?: string`, `lat?: number`, `lng?: number`, `accuracy?: number`, `status: "pending" | "approved" | "rejected"`, `serial: string` (تسلسلي فريد `RD-YYYYMMDD-####`), `by?: string`.
-- إخفاء سجل القراءات وأزرار الفوترة عن القارئ نهائياً (موجود جزئياً — نُعزّزه).
+  -- Ensure profile row exists (trigger handle_new_user also does this).
+  INSERT INTO public.profiles (id, display_name)
+  VALUES (v_uid, 'mofeed2020')
+  ON CONFLICT (id) DO NOTHING;
 
-## 3) الفوترة التلقائية + المتأخرات + اعتماد المدير للقراءة فقط
+  -- Grant super_admin (tenant_id NULL is fine for platform-wide role).
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (v_uid, 'super_admin')
+  ON CONFLICT (user_id, role) DO NOTHING;
+END $$;
+```
 
-في `store.ts`:
+Notes:
+- Writes to the `auth` schema are normally off-limits, but a one-shot seed is the only way to create the account without a Supabase Dashboard. If the migration is rejected on that basis, the fallback is: you sign up once through a temporary email/password screen, then re-run only the last two INSERTs against your real `auth.uid()`.
+- Password is hashed with `crypt(... 'bf')` so `signInWithPassword` accepts `1234`.
 
-- `addReading` تُنشئ القراءة بحالة `pending` وتُصدر فوراً فاتورة معلقة (`generateBill` داخلياً) بحقول جديدة: `serial: "INV-YYYYMMDD-####"`, `timestamp`, `photo`, `arrears`, `subtotal`, `total = subtotal + arrears`.
-- حساب `arrears` = مجموع رصيد الفواتير غير المسددة (`unpaid`/`partial`) السابقة لنفس المشترك عبر دالة `computeArrears(customerId)`.
-- إجراءات جديدة: `approveReading(id)` و `rejectReading(id)` — تُغيّر حالة القراءة فقط (لا تعديل على `current`/`consumption`).
-- إزالة أي `updateReading` أو حقول قابلة للتعديل يدوياً من الواجهات.
+### 2. Wire the demo login to Supabase (code — after migration approval)
+Small change in `src/lib/auth.ts` so the username field actually establishes a Supabase session (required for `auth.uid()` in RLS):
+- In `login(name, role, password)`, after the local checks succeed, also call `supabase.auth.signInWithPassword({ email: `${name}@mizan.local`, password })`.
+- If that call succeeds, call `hydrateFromSupabase()` so `isSuperAdmin` gets populated from `user_roles`.
+- If it fails (unknown username), keep the current offline behaviour so meter readers in low-connectivity zones still work.
 
-واجهة اعتماد المدير:
-- إعادة استخدام `src/routes/readings.tsx` (تبويب «بانتظار الاعتماد») بدلاً من صفحة `pending-requests`: عرض الصورة، الإحداثيات (رابط خرائط)، القراءة، الاستهلاك، المبلغ، مع زرَّيْ «اعتماد» و«رفض» فقط — لا يوجد أي حقل رقمي قابل للتحرير.
-- في `bills.tsx` عرض بند «متأخرات سابقة» عند > 0 في جدول الفواتير وفي إيصال الطباعة.
+### 3. Re-enable the `/super-admin` gate
+`src/routes/super-admin/index.tsx` currently short-circuits to `setAllowed(true)` (the temporary bypass we added earlier). Restore the real check: allow only when `useAuth().user.isSuperAdmin === true`.
 
-## 4) تدفق التحصيل الموحّد (نقدي + الكريمي) بحالة معلقة
+## Verification after run
+1. Log in with username `mofeed2020` / password `1234`.
+2. Open `/super-admin` — dashboard loads (no redirect).
+3. `SELECT role FROM public.user_roles WHERE user_id = auth.uid();` returns `super_admin`.
+4. Activate a tenant from `/subscription` — `activate_tenant` RPC succeeds.
 
-- إضافة حقل `status: "pending" | "approved" | "rejected"` إلى `Payment` وحقل `by?: string` (المُحصِّل).
-- `addPayment` تُدرج الدفعة بحالة `pending` ولا تُغيّر حالة الفاتورة حتى الاعتماد.
-- إجراءات جديدة: `approvePayment(id)` (تحدّث حالة الفاتورة، وتُخصم من الرصيد آنياً) و `rejectPayment(id)`.
-- `payments.tsx` تصبح صفحة «التحصيل» بتبويبين: «بانتظار الاعتماد» و«المعتمَدة»، مع أزرار اعتماد/رفض للمدير فقط. تحديث الفواتير والتقارير آنياً بعد الاعتماد.
-- إبقاء طريقتَيْ الدفع فقط: «نقدي» و«الكريمي (تحويل)». إزالة «تحويل بنكي/محفظة» من قائمة الطرق في `bills.tsx`.
-
-## 5) هوية المساعد «ميزان الذكي» + الردود المهيكلة
-
-- إعادة تسمية الصفحة إلى **«ميزان الذكي»** مع أيقونة SVG مخصصة (ميزان + شبكة رقمية) داخل مكوّن `MizanAiIcon`. إزالة أي ذكر لـ «Gemini AI · محلي».
-- إضافة زر «تحديث ومزامنة» في رأس المساعد يستدعي `syncPending()` ثم يُعيد رسم اللقطة الحالية للبيانات (يزيد `refreshKey` في state).
-- ترقية `ai-intent.ts` لدعم أربع نوايا بمخرجات مهيكلة (كائنات UI بدل نص):
-
-  1. `subscriber_ledger`: استعلام عن مشترك → بطاقة بها الاستهلاك المتتابع (شارت شريطي بسيط من `recharts`)، إجمالي المدفوع، المتأخرات الحالية.
-  2. `loss_analysis`: تحليل فاقد لفترة → مقارنة إنتاج/استهلاك، نسبة الفاقد، إن > 15% وسم أحمر + توصية «تدقيق تسريبات/توصيلات غير مشروعة».
-  3. `payment_status`: من دفع/لم يدفع → قائمتان (خضراء/حمراء) مع زر «تصدير CSV».
-  4. `revenue_report`: تقرير التحصيل → بطاقات: نقدي/الكريمي/الإجمالي + شارت خطي حسب اليوم + مؤشرات أداء.
-
-- تعريف نوع `AiResponse = { kind: "text" | "card" | "chart" | "list" | "suggestions"; ... }` وعارض `AiResponseRenderer` جديد يرسم بطاقات وأيقونات ومكوّنات `recharts`.
-- عند الغموض: `suggestions` تُعيد أزرار رد سريعة مبنية على البيانات (مثلاً أسماء مشتركين حديثين، أسماء المديريات).
-
-## تفاصيل تقنية
-
-- ملفات جديدة:
-  - `src/lib/geolocation.ts` (Promise-wrapper).
-  - `src/lib/ai-intent.ts` (يُعاد كتابته لإعادة كائنات مهيكلة).
-  - `src/components/mizan-ai-icon.tsx`.
-  - `src/components/ai-response.tsx` (renderer).
-  - `src/components/subscriber-search.tsx` (بحث ذكي بواجهة Command).
-- ملفات محذوفة:
-  - `src/routes/meters.tsx`, `src/routes/pending-requests.tsx`.
-- ملفات معدَّلة كبيراً:
-  - `src/lib/store.ts` (schema + migration v4، `adminCreateSubscriber`، `approveReading`, `approvePayment`, `computeArrears`, تسلسلات فواتير/قراءات).
-  - `src/components/app-shell.tsx` (تنظيف NAV).
-  - `src/components/meter-camera.tsx` (تمرير `expectedSerial` واستدعاء رفض المطابقة).
-  - `src/routes/readings.tsx` (بحث، GPS، تحقق OCR، تبويب اعتماد).
-  - `src/routes/bills.tsx` (متأخرات، طرق الدفع، إيصال).
-  - `src/routes/payments.tsx` (اعتماد/رفض).
-  - `src/routes/customers.tsx` (نموذج موحد).
-  - `src/routes/assistant.tsx` (رأس ميزان الذكي، زر مزامنة، renderer).
-- ترحيل مخزن (`version: 4`) يعيّن الحقول الجديدة بقيم افتراضية: القراءات القديمة `status="approved"`, الفواتير القديمة `serial` مولّد من `id`, المدفوعات القديمة `status="approved"`.
-- إبقاء `zustand`, `tesseract.js`, `recharts` (موجودة) — لا تبعيّات جديدة.
-
-## القيود
-
-- OCR يبقى محلياً عبر `tesseract.js`؛ لا يوجد ذكاء اصطناعي بصري متقدم بدون إنترنت.
-- GPS يعتمد على إذن المتصفح؛ في المعاينة داخل iframe قد يفشل.
-- لا يوجد نظام هويات مركزي (لا Cloud) — الاعتماد على أدوار Zustand محلياً كما هو مصمَّم.
-
-هل أبدأ التنفيذ؟
+## Out of scope
+- No changes to `src/lib/ai-intent.ts` or `src/routes/assistant.tsx`.
+- No changes to tenant/water tables or their RLS policies.
