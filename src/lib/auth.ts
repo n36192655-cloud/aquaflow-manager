@@ -22,12 +22,13 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   loginError: LicenseStatus | "bad_credentials" | null;
-  login: (name: string, role: Role, password: string) => boolean;
+  login: (name: string, role: Role, password: string) => Promise<boolean>;
   loginWithSupabase: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   heartbeat: () => void;
   hydrateFromSupabase: () => Promise<void>;
 }
+
 
 // Offline-only demo credentials used when the app runs without a Supabase session
 const DEMO_PASSWORD = "1234";
