@@ -1,0 +1,13 @@
+{
+  "name": "منصة ميزان لإستدامة خدمات المياه",
+  "short_name": "ميزان",
+  "description": "منصة تشغيل وإستدامة خدمات المياه — مشروع مياه المسراخ",
+  "lang": "ar",
+  "dir": "rtl",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "theme_color": "#0077b6",
+  "background_color": "#f8fafc",
+  "icons": [{"src":"/favicon.ico","sizes":"any","type":"image/x-icon"}]
+}
