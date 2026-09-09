@@ -1,0 +1,107 @@
+-- Mizan field-readiness foundation: authoritative water-meter and billing semantics.
+-- No service-role key is required by these APIs; access is through authenticated + RLS.
+
+CREATE TABLE IF NOT EXISTS public.meter_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  display_kind TEXT NOT NULL DEFAULT 'digital' CHECK (display_kind IN ('digital','mechanical','analog','hybrid')),
+  integer_digits SMALLINT NOT NULL DEFAULT 0 CHECK (integer_digits >= 0 AND integer_digits <= 12),
+  decimal_digits SMALLINT NOT NULL DEFAULT 0 CHECK (decimal_digits >= 0 AND decimal_digits <= 6),
+  register_semantics TEXT NOT NULL DEFAULT 'profile_defined',
+  display_notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.water_meters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+  meter_number TEXT NOT NULL,
+  profile_id UUID REFERENCES public.meter_profiles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','pending')),
+  installed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, meter_number)
+);
+
+CREATE TABLE IF NOT EXISTS public.billing_cycles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  cycle_code TEXT NOT NULL,
+  starts_at TIMESTAMPTZ NOT NULL,
+  ends_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','locked')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, cycle_code),
+  CHECK (ends_at > starts_at)
+);
+
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS meter_id UUID REFERENCES public.water_meters(id) ON DELETE SET NULL;
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS client_id TEXT;
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS identity_status TEXT NOT NULL DEFAULT 'unverified';
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS identity_confidence NUMERIC CHECK (identity_confidence IS NULL OR (identity_confidence >= 0 AND identity_confidence <= 1));
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS reading_confidence NUMERIC CHECK (reading_confidence IS NULL OR (reading_confidence >= 0 AND reading_confidence <= 1));
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS decimal_places SMALLINT NOT NULL DEFAULT 0 CHECK (decimal_places >= 0 AND decimal_places <= 6);
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS captured_at TIMESTAMPTZ;
+ALTER TABLE public.water_readings ADD COLUMN IF NOT EXISTS sync_status TEXT NOT NULL DEFAULT 'synced';
+ALTER TABLE public.water_bills ADD COLUMN IF NOT EXISTS meter_id UUID REFERENCES public.water_meters(id) ON DELETE SET NULL;
+ALTER TABLE public.water_bills ADD COLUMN IF NOT EXISTS cycle_id UUID REFERENCES public.billing_cycles(id) ON DELETE SET NULL;
+ALTER TABLE public.water_bills ADD COLUMN IF NOT EXISTS invoice_number TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_water_readings_tenant_client_id ON public.water_readings(tenant_id, client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_water_meters_customer ON public.water_meters(tenant_id, customer_id);
+CREATE INDEX IF NOT EXISTS idx_water_readings_meter_time ON public.water_readings(tenant_id, meter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_water_bills_customer_cycle ON public.water_bills(tenant_id, customer_id, cycle_id);
+
+ALTER TABLE public.meter_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.water_meters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.billing_cycles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tenant read meter profiles" ON public.meter_profiles;
+DROP POLICY IF EXISTS "manager write meter profiles" ON public.meter_profiles;
+CREATE POLICY "tenant read meter profiles" ON public.meter_profiles FOR SELECT TO authenticated USING (tenant_id = public.current_tenant_id() OR public.is_super_admin());
+CREATE POLICY "manager write meter profiles" ON public.meter_profiles FOR ALL TO authenticated USING (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin()) WITH CHECK (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "tenant read meters" ON public.water_meters;
+DROP POLICY IF EXISTS "manager write meters" ON public.water_meters;
+CREATE POLICY "tenant read meters" ON public.water_meters FOR SELECT TO authenticated USING (tenant_id = public.current_tenant_id() OR public.is_super_admin());
+CREATE POLICY "manager write meters" ON public.water_meters FOR ALL TO authenticated USING (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin()) WITH CHECK (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin());
+
+DROP POLICY IF EXISTS "tenant read billing cycles" ON public.billing_cycles;
+DROP POLICY IF EXISTS "manager write billing cycles" ON public.billing_cycles;
+CREATE POLICY "tenant read billing cycles" ON public.billing_cycles FOR SELECT TO authenticated USING (tenant_id = public.current_tenant_id() OR public.is_super_admin());
+CREATE POLICY "manager write billing cycles" ON public.billing_cycles FOR ALL TO authenticated USING (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin()) WITH CHECK (public.has_tenant_role(tenant_id,'manager') OR public.is_super_admin());
+
+-- Server-side invariant: the supplied meter must belong to the authenticated tenant and customer.
+CREATE OR REPLACE FUNCTION public.validate_water_meter_assignment(_meter_id UUID, _customer_id UUID)
+RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.water_meters m
+    WHERE m.id = _meter_id
+      AND m.customer_id = _customer_id
+      AND m.tenant_id = public.current_tenant_id()
+      AND m.status = 'active'
+  );
+$$;
+
+-- Authoritative decimal semantics: never infer fractional places from display colour.
+CREATE OR REPLACE FUNCTION public.meter_precision(_meter_id UUID)
+RETURNS SMALLINT LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT COALESCE(mp.decimal_digits, 0)::SMALLINT
+  FROM public.water_meters m LEFT JOIN public.meter_profiles mp ON mp.id = m.profile_id
+  WHERE m.id = _meter_id AND m.tenant_id = public.current_tenant_id();
+$$;
+
+REVOKE ALL ON FUNCTION public.validate_water_meter_assignment(UUID, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.validate_water_meter_assignment(UUID, UUID) TO authenticated;
+REVOKE ALL ON FUNCTION public.meter_precision(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.meter_precision(UUID) TO authenticated;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.water_meters;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.billing_cycles;
