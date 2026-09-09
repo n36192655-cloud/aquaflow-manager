@@ -21,6 +21,9 @@ const NAV: NavItem[] = [
   { to: "/subscription", label: "الاشتراك", icon: ShieldCheck, roles: ["admin"] },
 ];
 
+export const PRODUCT_NAME = "منصة ميزان لإستدامة خدمات المياه";
+export const PROJECT_NAME = "مشروع مياه المسراخ";
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -28,10 +31,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnlineStatus();
   const license = useLicense();
 
-  // Init license on first mount
   useEffect(() => { license.initIfNeeded(); }, [license]);
 
-  // License validation gate — locks the app when subscription expires / invalid
   useEffect(() => {
     const status = license.validate();
     if (status !== "active" && pathname !== "/subscription" && pathname !== "/login") {
@@ -39,22 +40,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, license, navigate]);
 
-  // Route protection
   useEffect(() => {
     if (pathname === "/login") return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
-    if (pathname === "/subscription") return; // always accessible when signed in
-    if (!canAccess(user.role, pathname)) {
-      navigate({ to: defaultRouteFor(user.role), replace: true });
-    }
+    if (pathname === "/subscription") return;
+    if (!canAccess(user.role, pathname)) navigate({ to: defaultRouteFor(user.role), replace: true });
   }, [pathname, user, navigate]);
 
-  // Auto-sync when coming online
   useEffect(() => {
-    if (online) syncPending();
+    if (online) void syncPending();
   }, [online]);
 
-  // Heartbeat — keeps seat alive
   useEffect(() => {
     if (!user?.seatId) return;
     heartbeat();
@@ -62,14 +58,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, [user?.seatId, heartbeat]);
 
-  if (pathname === "/login" || !user) {
-    return <>{children}</>;
-  }
-
-  // Full-screen subscription page (no shell) when locked
-  if (license.validate() !== "active" || pathname === "/subscription") {
-    return <>{children}</>;
-  }
+  if (pathname === "/login" || !user) return <>{children}</>;
+  if (license.validate() !== "active" || pathname === "/subscription") return <>{children}</>;
 
   const nav = NAV.filter((n) => n.roles.includes(user.role));
 
@@ -81,9 +71,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="relative w-9 h-9 rounded-xl grid place-items-center" style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}>
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold tracking-tight">ميزان</div>
-              <div className="text-[11px] text-sidebar-foreground/60">منصة إدارة العدادات</div>
+              <div className="text-[11px] leading-4 text-sidebar-foreground/60">إستدامة خدمات المياه</div>
             </div>
           </div>
         </div>
@@ -91,61 +81,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           {nav.map((item) => {
             const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
             const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-accent text-sidebar-primary font-semibold"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </Link>
-            );
+            return <Link key={item.to} to={item.to} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", active ? "bg-sidebar-accent text-sidebar-primary font-semibold" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}><Icon className="w-4 h-4" /><span>{item.label}</span></Link>;
           })}
         </nav>
         <div className="px-4 py-4 border-t border-sidebar-border space-y-2">
-          <div className="text-xs">
-            <div className="font-semibold text-sidebar-foreground">{user.name}</div>
-            <div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div>
-          </div>
-          <button
-            onClick={() => { logout(); navigate({ to: "/login", replace: true }); }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
-          >
-            <LogOut className="w-3 h-3" /> تسجيل الخروج
-          </button>
-          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">تعز — اليمن · إصدار 2.0</div>
+          <div className="text-xs"><div className="font-semibold text-sidebar-foreground">{user.name}</div><div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div></div>
+          <button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"><LogOut className="w-3 h-3" /> تسجيل الخروج</button>
+          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">تعز — اليمن · {PROJECT_NAME}</div>
         </div>
       </aside>
-
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2">
-          <div className="md:hidden font-bold">ميزان</div>
-          <div className="hidden md:block text-xs text-muted-foreground">{ROLE_LABEL[user.role]} — {user.name}</div>
-          <NetworkStatus />
-        </header>
+        <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2"><div className="md:hidden font-bold">ميزان</div><div className="hidden md:block text-xs text-muted-foreground">{ROLE_LABEL[user.role]} — {user.name}</div><NetworkStatus /></header>
         <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
         <CopyrightFooter className="border-t" />
         <nav className="md:hidden sticky bottom-0 grid bg-sidebar text-sidebar-foreground border-t border-sidebar-border" style={{ gridTemplateColumns: `repeat(${nav.length + 1}, minmax(0,1fr))` }}>
-          {nav.map((item) => {
-            const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
-            const Icon = item.icon;
-            return (
-              <Link key={item.to} to={item.to} className={cn("flex flex-col items-center gap-1 py-2 text-[10px]", active ? "text-sidebar-primary" : "text-sidebar-foreground/70")}>
-                <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-          <button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70">
-            <LogOut className="w-4 h-4" />
-            <span>خروج</span>
-          </button>
+          {nav.map((item) => { const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to)); const Icon = item.icon; return <Link key={item.to} to={item.to} className={cn("flex flex-col items-center gap-1 py-2 text-[10px]", active ? "text-sidebar-primary" : "text-sidebar-foreground/70")}><Icon className="w-4 h-4" /><span>{item.label}</span></Link>; })}
+          <button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70"><LogOut className="w-4 h-4" /><span>خروج</span></button>
         </nav>
       </div>
     </div>
