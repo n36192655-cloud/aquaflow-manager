@@ -9,4 +9,4 @@
 @utility bg-water { background-color:var(--water);color:white; }
 @utility text-water { color:var(--water); }
 @utility bg-water-soft { background-color:var(--water-soft); }
-@media print { body * { visibility:hidden !important; } #printable, #printable * { visibility:visible !important; } #printable { position:absolute !important; inset:0 !important; width:100% !important; border:0 !important; box-shadow:none !important; } }
+@media print { body * { visibility:hidden !important; } #printable, #printable * { visibility:visible !important; } #printable { position:absolute !important; inset:0 !important; width:100% !important; border:0 !important; box-shadow:none !important; } #printable::before { content:"مشروع مياه المسراخ"; display:block; text-align:center; font-weight:700; font-size:18px; margin-bottom:8px; } }
