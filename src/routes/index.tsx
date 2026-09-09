@@ -2,148 +2,67 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
 import { fmtYER, fmtNum } from "@/lib/pricing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Droplets, Users, AlertTriangle, Receipt, TrendingUp } from "lucide-react";
+import { Droplets, Users, AlertTriangle, Receipt, TrendingUp, Camera, CheckCircle2, WifiOff, Clock3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, Legend } from "recharts";
+import { useOnlineStatus, usePendingCount } from "@/lib/sync";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
 function Dashboard() {
   const { customers, meters, readings, bills, payments } = useStore();
-
+  const online = useOnlineStatus();
+  const pendingOffline = usePendingCount();
+  const activeCustomers = customers.filter((c) => c.status !== "rejected");
+  const activeMeters = meters.filter((m) => m.status === "active");
+  const approvedReadings = readings.filter((r) => r.status === "approved");
+  const pendingReadings = readings.filter((r) => r.status === "pending");
+  const rejectedReadings = readings.filter((r) => r.status === "rejected");
   const paid = bills.filter((b) => b.status === "paid");
-  const unpaid = bills.filter((b) => b.status !== "paid");
-  const totalRevenue = payments.reduce((a, b) => a + b.amount, 0) + paid.reduce((a, b) => a + b.total, 0);
-  const outstanding = unpaid.reduce((a, b) => a + b.total, 0);
-
-  const waterCons = readings.reduce((a, b) => a + b.consumption, 0);
+  const openBills = bills.filter((b) => b.status !== "paid");
+  const outstanding = openBills.reduce((sum, b) => sum + Math.max(0, b.total - payments.filter((p) => p.bill_id === b.id && p.status === "approved").reduce((a, p) => a + p.amount, 0)), 0);
+  const collections = payments.filter((p) => p.status === "approved").reduce((a, p) => a + p.amount, 0);
+  const consumption = approvedReadings.reduce((a, r) => a + Math.max(0, r.consumption), 0);
+  const readingCoverage = activeMeters.length ? Math.round((new Set(approvedReadings.map((r) => r.meter_id)).size / activeMeters.length) * 100) : 0;
+  const identityChecked = readings.filter((r) => r.ocr_serial).length;
+  const identityMatches = readings.filter((r) => r.ocr_serial && r.ocr_serial.replace(/[-\s]/g, "").toUpperCase() === r.serial.replace(/^RD-[0-9]+-/i, "").replace(/[-\s]/g, "").toUpperCase()).length;
   const suspicious = readings.filter((r) => r.flag !== "ok");
 
-  const byMeter = new Map<number, number>();
-  readings.forEach((r) => {
-    byMeter.set(r.meter_id, (byMeter.get(r.meter_id) ?? 0) + r.consumption);
-  });
-  const chartData = meters.slice(0, 10).map((m) => {
-    const c = customers.find((c) => c.id === m.customer_id);
-    return {
-      name: c?.name.split(" ")[0] ?? m.number,
-      water: byMeter.get(m.id) ?? 0,
-    };
-  });
+  return <div className="space-y-6">
+    <div className="flex items-start justify-between gap-3"><div><h1 className="text-2xl md:text-3xl font-bold">لوحة التحكم</h1><p className="text-sm text-muted-foreground mt-1">منصة ميزان لإستدامة خدمات المياه — {"مشروع مياه المسراخ"}</p></div><Badge variant={online ? "outline" : "destructive"}>{online ? "متصل" : "أوفلاين"}</Badge></div>
 
-  const revPie = [
-    { name: "مدفوع", value: paid.reduce((a, b) => a + b.total, 0) },
-    { name: "غير مدفوع", value: outstanding },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">لوحة التحكم</h1>
-        <p className="text-sm text-muted-foreground mt-1">نظرة شاملة على شبكة المياه — تعز</p>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="إجمالي الإيرادات" value={fmtYER(totalRevenue)} icon={<TrendingUp className="w-5 h-5" />} />
-        <StatCard title="مستحقات غير محصلة" value={fmtYER(outstanding)} icon={<Receipt className="w-5 h-5" />} />
-        <StatCard title="استهلاك المياه" value={`${fmtNum(waterCons)} م³`} icon={<Droplets className="w-5 h-5" />} />
-        <StatCard title="مشتركون" value={fmtNum(customers.length)} icon={<Users className="w-5 h-5" />} />
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MiniCard label="عدادات نشطة" value={meters.filter((m) => m.status === "active").length} icon={<Droplets className="w-4 h-4" />} />
-        <MiniCard label="فواتير" value={bills.length} icon={<Receipt className="w-4 h-4" />} />
-        <MiniCard label="مدفوعات" value={payments.length} icon={<TrendingUp className="w-4 h-4" />} />
-        <MiniCard label="تنبيهات" value={suspicious.length} icon={<AlertTriangle className="w-4 h-4" />} highlight={suspicious.length > 0} />
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>الاستهلاك حسب المشترك</CardTitle></CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="water" name="مياه (م³)" fill="var(--water)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>حالة التحصيل</CardTitle></CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={revPie} dataKey="value" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                  <Cell fill="var(--water)" />
-                  <Cell fill="var(--muted-foreground)" />
-                </Pie>
-                <Tooltip formatter={(v: number) => fmtYER(v)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" /> تنبيهات ذكية</CardTitle>
-          <Badge variant="outline">{suspicious.length}</Badge>
-        </CardHeader>
-        <CardContent>
-          {suspicious.length === 0 ? (
-            <p className="text-sm text-muted-foreground">لا توجد قراءات شاذة حالياً. النظام يراقب استهلاك المياه تلقائياً ويكشف: التسرب، التلاعب، والقفزات غير الطبيعية (أكثر من 3× المتوسط).</p>
-          ) : (
-            <ul className="space-y-2">
-              {suspicious.slice(0, 10).map((r) => {
-                const m = meters.find((x) => x.id === r.meter_id);
-                const c = customers.find((x) => x.id === m?.customer_id);
-                return (
-                  <li key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 text-sm">
-                    <div>
-                      <span className="font-semibold">{c?.name}</span> — عداد {m?.number}
-                    </div>
-                    <Badge variant={r.flag === "error" ? "destructive" : "secondary"}>
-                      {r.flag === "error" ? "قراءة خاطئة" : "استهلاك مشبوه"}
-                    </Badge>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard title="المشتركون النشطون" value={fmtNum(activeCustomers.length)} icon={<Users className="w-5 h-5" />} />
+      <StatCard title="العدادات النشطة" value={fmtNum(activeMeters.length)} icon={<Droplets className="w-5 h-5" />} />
+      <StatCard title="تغطية القراءات" value={`${readingCoverage}%`} icon={<Camera className="w-5 h-5" />} />
+      <StatCard title="الاستهلاك المعتمد" value={`${fmtNum(consumption)} م³`} icon={<Droplets className="w-5 h-5" />} />
     </div>
-  );
-}
 
-function StatCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs text-muted-foreground">{title}</div>
-            <div className="mt-2 text-xl md:text-2xl font-bold">{value}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg grid place-items-center" style={{ background: "var(--water-soft)", color: "var(--water)" }}>{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+    <Card><CardHeader><CardTitle>سلسلة التشغيل</CardTitle></CardHeader><CardContent className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+      <Process label="صور/قراءات" value={readings.length} icon={<Camera />} />
+      <Process label="تحقق هوية" value={identityChecked} icon={<CheckCircle2 />} />
+      <Process label="مقبولة" value={approvedReadings.length} icon={<CheckCircle2 />} />
+      <Process label="معلقة" value={pendingReadings.length} icon={<Clock3 />} />
+      <Process label="مرفوضة" value={rejectedReadings.length} icon={<AlertTriangle />} />
+      <Process label="فواتير" value={bills.length} icon={<Receipt />} />
+      <Process label="مدفوعة" value={paid.length} icon={<CheckCircle2 />} />
+      <Process label="مزامنة معلقة" value={pendingOffline} icon={<WifiOff />} />
+    </CardContent></Card>
 
-function MiniCard({ label, value, icon, highlight }: { label: string; value: number; icon: React.ReactNode; highlight?: boolean }) {
-  return (
-    <div className={`p-4 rounded-xl border ${highlight ? "border-destructive/40 bg-destructive/5" : "bg-card"}`}>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}<span>{label}</span></div>
-      <div className={`mt-1 text-2xl font-bold ${highlight ? "text-destructive" : ""}`}>{fmtNum(value)}</div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard title="التحصيل المعتمد" value={fmtYER(collections)} icon={<TrendingUp className="w-5 h-5" />} />
+      <StatCard title="الرصيد المستحق" value={fmtYER(outstanding)} icon={<Receipt className="w-5 h-5" />} />
+      <StatCard title="قراءات مشبوهة/خاطئة" value={fmtNum(suspicious.length)} icon={<AlertTriangle className="w-5 h-5" />} />
+      <StatCard title="فواتير غير مسددة" value={fmtNum(openBills.length)} icon={<Receipt className="w-5 h-5" />} />
     </div>
-  );
+
+    <Card><CardHeader className="flex flex-row items-center justify-between"><CardTitle>سلامة القراءة</CardTitle><Badge variant={suspicious.length ? "destructive" : "outline"}>{suspicious.length ? "تحتاج مراجعة" : "لا توجد تنبيهات"}</Badge></CardHeader><CardContent className="space-y-3 text-sm">
+      <div className="flex justify-between"><span>قراءات بانتظار الاعتماد</span><strong>{pendingReadings.length}</strong></div>
+      <div className="flex justify-between"><span>قراءات تم ربطها بنتيجة OCR</span><strong>{identityChecked}</strong></div>
+      <div className="flex justify-between"><span>الفواتير ذات رصيد مستحق</span><strong>{openBills.length}</strong></div>
+      <p className="text-xs text-muted-foreground">لا تعتبر نتيجة OCR أو لون أرقام العداد إثباتًا نهائيًا للدقة العشرية؛ القراءة المعتمدة يجب أن تطابق ملف العداد ومراجعة المشغّل عند انخفاض الثقة.</p>
+    </CardContent></Card>
+  </div>;
 }
+
+function StatCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) { return <Card><CardContent className="p-5"><div className="flex items-start justify-between"><div><div className="text-xs text-muted-foreground">{title}</div><div className="mt-2 text-xl md:text-2xl font-bold">{value}</div></div><div className="w-10 h-10 rounded-lg grid place-items-center bg-water-soft text-water">{icon}</div></div></CardContent></Card>; }
+function Process({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) { return <div className="rounded-lg border p-3 min-w-0"><div className="flex items-center gap-1 text-[11px] text-muted-foreground">{icon}<span className="truncate">{label}</span></div><div className="mt-1 text-lg font-bold">{fmtNum(value)}</div></div>; }
