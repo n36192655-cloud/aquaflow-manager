@@ -4,7 +4,7 @@ import { useLicense, type LicenseStatus } from "./license";
 import { supabase } from "./supabase";
 export type Role = "admin" | "reader" | "cashier";
 export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; }
-interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
+interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; changePassword: (newPassword: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
 export const useAuth = create<AuthState>()(persist((set) => ({
   user: null, loginError: null,
   login: async (username, password) => {
@@ -20,6 +20,11 @@ export const useAuth = create<AuthState>()(persist((set) => ({
       set({ user: { ...u, seatId: seat.seatId }, loginError: null }); return true;
     } catch (error) { console.error("[Mizan] authentication failed", error); set({ loginError: "not_configured" }); return false; }
   },
+  changePassword: async (newPassword) => {
+    if (newPassword.length < 8) return false;
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return !error;
+  },
   logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut(); set({ user: null, loginError: null }); },
   hydrateFromSupabase: async () => {
     const { data: userData } = await supabase.auth.getUser(); const user = userData.user; if (!user) { set({ user: null }); return; }
@@ -32,5 +37,5 @@ export const useAuth = create<AuthState>()(persist((set) => ({
   heartbeat: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().touchSeat(u.seatId); },
 }), { name: "mizan-auth-v4" }));
 export const ROLE_LABEL: Record<Role, string> = { admin: "مدير مشروع", reader: "قارئ عدادات", cashier: "محصل" };
-export function canAccess(role: Role | undefined, path: string): boolean { if (!role) return false; if (path.startsWith("/super-admin")) return false; if (role === "admin") return true; if (role === "reader") return path === "/readings"; if (role === "cashier") return path === "/bills" || path === "/payments"; return false; }
+export function canAccess(role: Role | undefined, path: string): boolean { if (!role) return false; if (path.startsWith("/super-admin")) return false; if (role === "admin") return true; if (role === "reader") return path === "/readings" || path === "/account"; if (role === "cashier") return path === "/bills" || path === "/payments" || path === "/account"; return false; }
 export function defaultRouteFor(role: Role): string { if (role === "reader") return "/readings"; if (role === "cashier") return "/bills"; return "/"; }
