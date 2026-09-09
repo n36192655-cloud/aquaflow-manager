@@ -1,80 +1,60 @@
-## Goal
-Grant `super_admin` in `user_roles` to the username **mofeed2020** so the owner dashboard, subscription guard, and tenant activation RPCs all recognise you as the platform owner.
+# تقرير تدقيق للقراءة فقط — ميزان (لم يُنفَّذ أي تعديل)
 
-## Why a plain INSERT is not enough
-`public.user_roles.user_id` is a foreign key to `auth.users(id)`. The current login screen is offline-only (username + demo password `1234`, stored in Zustand) and never creates a Supabase auth user, so:
-- `auth.users` is empty (confirmed by query).
-- No `user_id` exists to insert into `user_roles`.
-- `/super-admin`, `activate_tenant` RPC, and every RLS policy that calls `has_role(auth.uid(), 'super_admin')` will keep failing until a real signed-in session exists.
+جميع النتائج أدناه مستخرجة بأوامر قراءة فقط من قاعدة البيانات الفعلية. لم يتم تنفيذ أي إضافة أو تعديل أو حذف أو تغيير في البنية.
 
-We need to (a) create a real auth user tied to the username `mofeed2020`, (b) insert its `user_roles` row as `super_admin`, and (c) make the existing username login actually sign that user into Supabase so `auth.uid()` is populated.
+## 1. حالة البيانات الحقيقية
 
-## Plan
+| الجدول | عدد السجلات |
+|---|---|
+| tenants (مشاريع المياه) | 2 |
+| profiles | 1 |
+| user_roles | 1 |
+| customers | 0 |
+| water_readings | 0 |
+| water_bills | 0 |
+| payments | 0 |
+| audit_logs | 0 |
+| حسابات الدخول (Auth) | 1 |
 
-### 1. Migration — seed the super_admin
-Runs inside a single security-definer block so we can call Supabase's admin API paths via SQL:
+المستأجرون الموجودون:
+- `client-mofeed2026` — نشط، ينتهي 2027-08-27
+- `مشروع مياه مركز المسراخ` — نشط، ينتهي 2027-09-09
 
-```sql
--- Create the auth user for username "mofeed2020" if missing.
--- We map username -> deterministic email so the demo login can sign in.
-DO $$
-DECLARE
-  v_email text := 'mofeed2020@mizan.local';
-  v_uid uuid;
-BEGIN
-  SELECT id INTO v_uid FROM auth.users WHERE email = v_email;
+الحساب الوحيد: `mofeed2020@mizan.local`، مؤكَّد البريد، لم يسجّل دخولاً فعليًا بعد (`last_sign_in_at` فارغ)، ويملك دور `super_admin` بدون ارتباط بأي مستأجر، و`tenant_id` في ملفه فارغ. لم يتم كشف أي كلمة مرور أو مفتاح.
 
-  IF v_uid IS NULL THEN
-    v_uid := extensions.uuid_generate_v4();
-    INSERT INTO auth.users
-      (id, instance_id, aud, role, email, encrypted_password,
-       email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-       created_at, updated_at)
-    VALUES
-      (v_uid, '00000000-0000-0000-0000-000000000000', 'authenticated',
-       'authenticated', v_email, crypt('1234', gen_salt('bf')),
-       now(), '{"provider":"email","providers":["email"]}'::jsonb,
-       jsonb_build_object('display_name','mofeed2020'),
-       now(), now());
-    INSERT INTO auth.identities
-      (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
-    VALUES
-      (extensions.uuid_generate_v4(), v_uid, v_uid::text,
-       jsonb_build_object('sub', v_uid::text, 'email', v_email),
-       'email', now(), now(), now());
-  END IF;
+## 2. ما يمكن إثباته من قاعدة البيانات
 
-  -- Ensure profile row exists (trigger handle_new_user also does this).
-  INSERT INTO public.profiles (id, display_name)
-  VALUES (v_uid, 'mofeed2020')
-  ON CONFLICT (id) DO NOTHING;
+- العزل بين المستأجرين مُفعَّل بنيويًا: RLS مُشغّل على الجداول الثمانية كلها، وكل جدول لديه سياسات (2 إلى 4 لكل جدول) تقيّد القراءة والكتابة بـ `tenant_id` الخاص بالمستخدم أو بدور معيّن.
+- لا توجد أي بيانات تشغيلية بعد (لا مشتركين، لا قراءات، لا فواتير، لا مدفوعات)، لذلك لا يوجد حاليًا أي احتمال تسرّب بيانات بين مشروعين — لا شيء لتسريبه.
+- المزامنة اللحظية مُفعَّلة على: `water_readings`، `water_bills`، `payments`، `tenants` فقط. الجداول `customers` و`profiles` و`user_roles` و`audit_logs` غير مشمولة.
+- سجل التدقيق (`audit_logs`) لا يمنع التعديل أو الحذف (لا سياسات لهما) لكنه فارغ ولا يُكتب فيه شيء حتى الآن.
 
-  -- Grant super_admin (tenant_id NULL is fine for platform-wide role).
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (v_uid, 'super_admin')
-  ON CONFLICT (user_id, role) DO NOTHING;
-END $$;
-```
+## 3. الثغرات والملاحظات المؤكَّدة
 
-Notes:
-- Writes to the `auth` schema are normally off-limits, but a one-shot seed is the only way to create the account without a Supabase Dashboard. If the migration is rejected on that basis, the fallback is: you sign up once through a temporary email/password screen, then re-run only the last two INSERTs against your real `auth.uid()`.
-- Password is hashed with `crypt(... 'bf')` so `signInWithPassword` accepts `1234`.
+1. **تفعيل الاشتراك مفتوح للعموم**: دالة `activate_tenant` قابلة للتنفيذ من زائر غير مسجّل، وتنشئ/تُفعّل مستأجرًا وتمدّد اشتراكه 365 يومًا. أي شخص يملك رابط المشروع يمكنه تفعيل اشتراك أو تمديده بنفسه. المدقق الأمني الآلي يرصد نفس النقطة (6 دوال بصلاحية تنفيذ عامة).
+2. **مُعرّفات المستأجرين متوقّعة**: المستأجرون منشأون بمعرّف مشتق من الاسم عبر md5، أي أن معرّف أي مشروع يمكن تخمينه من اسمه.
+3. **صلاحيات الجداول واسعة للزائر**: الزائر غير المسجّل يملك صلاحيات كاملة على كل الجداول على مستوى الصلاحيات؛ ما يحجبه فعليًا هو RLS وحده (لا سياسات للزائر). طبقة حماية واحدة بدل طبقتين.
+4. **لا يوجد ربط أجهزة ولا حد للمقاعد**: لا جدول للبصمات ولا أعمدة `max_devices` أو `representative_name` أو كود المستأجر. الوسيط `_max_seats` في دالة التفعيل يُستقبل ولا يُستخدم.
+5. **الهوية بالهاتف غير مدعومة**: لا توجد قيود فرادة على الهاتف داخل المستأجر، ولا مسار دخول بالاسم/الهاتف على مستوى القاعدة.
+6. **onboarding ناقص**: لا يوجد أي مستخدم مرتبط بأي من المستأجرين (مدير/قارئ/محصل)، ولا آلية تلقائية لربط `profiles.tenant_id`. أي حساب جديد سينشأ بدون مستأجر ولن يرى أي بيانات.
+7. **إمكانية رفع الصلاحية**: المستخدم يستطيع تحديث ملفه بنفسه بما يشمل `tenant_id`، أي يمكنه نظريًا نقل نفسه إلى مستأجر آخر والقراءة منه.
+8. **الأداء**: لا توجد فهارس على `tenant_id` أو المفاتيح الأجنبية في أي جدول — فقط فهارس المفاتيح الأساسية. سيبطئ ذلك القراءات مع نمو البيانات وسيثقل تقييم سياسات RLS.
+9. **المزامنة اللحظية للحذف/التعديل ناقصة**: هوية النسخ المتماثل افتراضية، لذلك أحداث التعديل والحذف تصل بحقول ناقصة.
 
-### 2. Wire the demo login to Supabase (code — after migration approval)
-Small change in `src/lib/auth.ts` so the username field actually establishes a Supabase session (required for `auth.uid()` in RLS):
-- In `login(name, role, password)`, after the local checks succeed, also call `supabase.auth.signInWithPassword({ email: `${name}@mizan.local`, password })`.
-- If that call succeeds, call `hydrateFromSupabase()` so `isSuperAdmin` gets populated from `user_roles`.
-- If it fails (unknown username), keep the current offline behaviour so meter readers in low-connectivity zones still work.
+## 4. ما لا يمكن إثباته من قاعدة البيانات
 
-### 3. Re-enable the `/super-admin` gate
-`src/routes/super-admin/index.tsx` currently short-circuits to `setAllowed(true)` (the temporary bypass we added earlier). Restore the real check: allow only when `useAuth().user.isSuperAdmin === true`.
+- سلامة سلوك التطبيق فعليًا (هل يُحترم العزل في الواجهة، هل يعمل التسجيل بالاسم) — يحتاج تجربة تشغيل حقيقية لا فحص قاعدة بيانات.
+- عدد الأجهزة المستخدمة فعليًا أو مشاركة الحسابات — لا يوجد أي تسجيل لذلك.
+- محاولات دخول فاشلة أو نشاط سابق — لا سجل تدقيق مكتوب.
+- إعدادات مزوّد الدخول ومهل الجلسات ليست جزءًا من الجداول ولم أفحصها في هذا التدقيق.
 
-## Verification after run
-1. Log in with username `mofeed2020` / password `1234`.
-2. Open `/super-admin` — dashboard loads (no redirect).
-3. `SELECT role FROM public.user_roles WHERE user_id = auth.uid();` returns `super_admin`.
-4. Activate a tenant from `/subscription` — `activate_tenant` RPC succeeds.
+## 5. أولويات الإصلاح المقترحة (للنقاش فقط — لم يُطبّق شيء)
 
-## Out of scope
-- No changes to `src/lib/ai-intent.ts` or `src/routes/assistant.tsx`.
-- No changes to tenant/water tables or their RLS policies.
+1. إغلاق `activate_tenant` أمام الزائر واستخدام معرّفات عشوائية للمستأجرين.
+2. منع المستخدم من تغيير `tenant_id` في ملفه.
+3. مسار onboarding يربط كل حساب جديد بمستأجره ودوره.
+4. جدول بصمات الأجهزة مع حد 3 أجهزة، ثم قفل المقاعد.
+5. فهارس على `tenant_id` وكل مفتاح أجنبي.
+6. تشديد سجل التدقيق ومنع تعديله/حذفه، وتوسيع المزامنة اللحظية.
+
+أخبرني بأي بند تريد أن أبدأ، وسأعدّ خطة تنفيذ مفصّلة له.
