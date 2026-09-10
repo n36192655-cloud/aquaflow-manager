@@ -55,6 +55,44 @@ export type Database = {
           },
         ]
       }
+      billing_cycles: {
+        Row: {
+          created_at: string
+          cycle_key: string
+          ends_at: string
+          id: string
+          starts_at: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_key: string
+          ends_at: string
+          id?: string
+          starts_at: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          cycle_key?: string
+          ends_at?: string
+          id?: string
+          starts_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_cycles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -99,10 +137,119 @@ export type Database = {
           },
         ]
       }
+      meter_profiles: {
+        Row: {
+          color_semantics: Json
+          created_at: string
+          decimal_digits: number
+          display_type: string
+          id: string
+          integer_digits: number
+          name: string
+          register_order: string
+          tenant_id: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          color_semantics?: Json
+          created_at?: string
+          decimal_digits?: number
+          display_type: string
+          id?: string
+          integer_digits?: number
+          name: string
+          register_order?: string
+          tenant_id: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          color_semantics?: Json
+          created_at?: string
+          decimal_digits?: number
+          display_type?: string
+          id?: string
+          integer_digits?: number
+          name?: string
+          register_order?: string
+          tenant_id?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meter_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meters: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          installed_at: string | null
+          profile_id: string | null
+          serial_number: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          installed_at?: string | null
+          profile_id?: string | null
+          serial_number: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          installed_at?: string | null
+          profile_id?: string | null
+          serial_number?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meters_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meters_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "meter_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meters_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
           bill_id: string
+          client_id: string | null
           collector_id: string | null
           created_at: string
           id: string
@@ -113,6 +260,7 @@ export type Database = {
         Insert: {
           amount: number
           bill_id: string
+          client_id?: string | null
           collector_id?: string | null
           created_at?: string
           id?: string
@@ -123,6 +271,7 @@ export type Database = {
         Update: {
           amount?: number
           bill_id?: string
+          client_id?: string | null
           collector_id?: string | null
           created_at?: string
           id?: string
@@ -187,6 +336,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          project_name: string | null
           subscription_expires_at: string | null
           subscription_status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
@@ -195,6 +345,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          project_name?: string | null
           subscription_expires_at?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
@@ -203,6 +354,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          project_name?: string | null
           subscription_expires_at?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
@@ -244,10 +396,13 @@ export type Database = {
       water_bills: {
         Row: {
           arrears: number
+          client_id: string | null
           created_at: string
           customer_id: string
+          cycle_id: string | null
           id: string
           issued_at: string
+          project_name: string | null
           reading_id: string | null
           status: string
           subtotal: number
@@ -256,10 +411,13 @@ export type Database = {
         }
         Insert: {
           arrears?: number
+          client_id?: string | null
           created_at?: string
           customer_id: string
+          cycle_id?: string | null
           id?: string
           issued_at?: string
+          project_name?: string | null
           reading_id?: string | null
           status?: string
           subtotal?: number
@@ -268,10 +426,13 @@ export type Database = {
         }
         Update: {
           arrears?: number
+          client_id?: string | null
           created_at?: string
           customer_id?: string
+          cycle_id?: string | null
           id?: string
           issued_at?: string
+          project_name?: string | null
           reading_id?: string | null
           status?: string
           subtotal?: number
@@ -284,6 +445,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "water_bills_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "billing_cycles"
             referencedColumns: ["id"]
           },
           {
@@ -304,50 +472,77 @@ export type Database = {
       }
       water_readings: {
         Row: {
+          capture_source: string
+          client_id: string | null
           consumption: number
           created_at: string
           current_reading: number
           customer_id: string | null
           flag: string
           id: string
+          identity_verified: boolean
           lat: number | null
           lng: number | null
+          meter_id: string | null
           meter_number: string
+          ocr_confidence: number | null
+          ocr_raw_text: string | null
           photo_url: string | null
           previous: number
           reader_id: string | null
+          reading_verified: boolean
+          review_reason: string | null
+          source_device: string | null
           status: string
           tenant_id: string
         }
         Insert: {
+          capture_source?: string
+          client_id?: string | null
           consumption?: number
           created_at?: string
           current_reading: number
           customer_id?: string | null
           flag?: string
           id?: string
+          identity_verified?: boolean
           lat?: number | null
           lng?: number | null
+          meter_id?: string | null
           meter_number: string
+          ocr_confidence?: number | null
+          ocr_raw_text?: string | null
           photo_url?: string | null
           previous?: number
           reader_id?: string | null
+          reading_verified?: boolean
+          review_reason?: string | null
+          source_device?: string | null
           status?: string
           tenant_id: string
         }
         Update: {
+          capture_source?: string
+          client_id?: string | null
           consumption?: number
           created_at?: string
           current_reading?: number
           customer_id?: string | null
           flag?: string
           id?: string
+          identity_verified?: boolean
           lat?: number | null
           lng?: number | null
+          meter_id?: string | null
           meter_number?: string
+          ocr_confidence?: number | null
+          ocr_raw_text?: string | null
           photo_url?: string | null
           previous?: number
           reader_id?: string | null
+          reading_verified?: boolean
+          review_reason?: string | null
+          source_device?: string | null
           status?: string
           tenant_id?: string
         }
@@ -357,6 +552,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "water_readings_meter_id_fkey"
+            columns: ["meter_id"]
+            isOneToOne: false
+            referencedRelation: "meters"
             referencedColumns: ["id"]
           },
           {
@@ -384,6 +586,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          project_name: string | null
           subscription_expires_at: string | null
           subscription_status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
@@ -394,6 +597,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      current_billing_cycle: {
+        Args: { p_at?: string; p_tenant: string }
+        Returns: string
       }
       current_tenant_id: { Args: never; Returns: string }
       has_role: {
@@ -411,6 +618,32 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      record_water_reading: {
+        Args: {
+          p_accuracy?: number
+          p_capture_source?: string
+          p_client_id?: string
+          p_current: number
+          p_lat?: number
+          p_lng?: number
+          p_meter_id: string
+          p_ocr_confidence?: number
+          p_ocr_raw_text?: string
+          p_ocr_serial?: string
+          p_photo_url?: string
+        }
+        Returns: {
+          arrears: number
+          bill_id: string
+          bill_total: number
+          consumption: number
+          current_reading: number
+          previous: number
+          project_name: string
+          reading_id: string
+        }[]
+      }
+      water_charge: { Args: { p_units: number }; Returns: number }
     }
     Enums: {
       app_role: "super_admin" | "manager" | "reader" | "collector"

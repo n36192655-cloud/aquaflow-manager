@@ -15,10 +15,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-const ROLES: { value: Role; icon: typeof ShieldCheck; desc: string }[] = [
-  { value: "admin", icon: ShieldCheck, desc: "لوحة التحكم والإحصائيات والمساعد الذكي" },
-  { value: "reader", icon: Camera, desc: "تصوير العدادات وإدخال القراءات ميدانياً" },
-  { value: "cashier", icon: Wallet, desc: "استلام الدفعات النقدية وإصدار السندات" },
+const ROLES: { value: Role; username: string; icon: typeof ShieldCheck; desc: string }[] = [
+  { value: "admin", username: "manager", icon: ShieldCheck, desc: "لوحة التحكم والإحصائيات والمساعد الذكي" },
+  { value: "cashier", username: "cashier", icon: Wallet, desc: "استلام الدفعات النقدية وإصدار السندات" },
+  { value: "reader", username: "reader", icon: Camera, desc: "تصوير العدادات وإدخال القراءات ميدانياً" },
 ];
 
 function LoginPage() {
@@ -29,7 +29,7 @@ function LoginPage() {
   useEffect(() => { setMounted(true); }, []);
   const licStatus = mounted ? lic.validate() : "active";
   const [role, setRole] = useState<Role>("admin");
-  const [name, setName] = useState("");
+  const [name, setName] = useState("manager");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
@@ -58,7 +58,10 @@ function LoginPage() {
                     <button
                       key={r.value}
                       type="button"
-                      onClick={() => setRole(r.value)}
+                      onClick={() => {
+                        setRole(r.value);
+                        setName(r.username);
+                      }}
                       className={`text-right p-3 rounded-lg border transition-colors flex items-start gap-3 ${
                         active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                       }`}
@@ -67,6 +70,7 @@ function LoginPage() {
                       <div>
                         <div className="font-semibold text-sm">{ROLE_LABEL[r.value]}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{r.desc}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1 font-mono" dir="ltr">{r.username}</div>
                       </div>
                     </button>
                   );
@@ -75,8 +79,8 @@ function LoginPage() {
             </div>
 
             <div>
-              <Label>الاسم</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="أدخل اسمك" />
+              <Label>اسم المستخدم</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم المستخدم" dir="ltr" />
             </div>
             <div>
               <Label>كلمة المرور</Label>
