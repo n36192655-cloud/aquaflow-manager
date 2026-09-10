@@ -399,12 +399,7 @@ function Dashboard() {
     );
   }
 
-  const alerts =
-    data.invalidReadings +
-    data.inconsistentReadings +
-    data.paidBillsWithoutLedger +
-    data.orphanPayments +
-    data.invalidPayments;
+  const alerts = data.invalidReadings + data.inconsistentReadings + data.collectionDataQuality.length;
 
   return (
     <TooltipProvider>
@@ -418,20 +413,10 @@ function Dashboard() {
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant={live === "live" ? "secondary" : "outline"}>
-              {live === "live"
-                ? "تحديث تلقائي مباشر"
-                : live === "connecting"
-                  ? "جارٍ الاتصال…"
-                  : "التحديث المباشر متوقف"}
+              {live === "live" ? "تحديث تلقائي مباشر" : live === "connecting" ? "جارٍ الاتصال…" : "التحديث المباشر متوقف"}
             </Badge>
             <span>آخر تحديث: {new Date(data.fetchedAt).toLocaleTimeString("ar")}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refetch()}
-              disabled={isFetching}
-              aria-label="تحديث البيانات"
-            >
+            <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching} aria-label="تحديث البيانات">
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
           </div>
@@ -456,20 +441,12 @@ function Dashboard() {
             title="معدل التحصيل الفعلي"
             value={collection === null ? "غير متاح" : `${collection.toFixed(1)}%`}
             icon={<Percent className="w-5 h-5" />}
-            sub={
-              collection === null
-                ? "لا يوجد مبلغ مفوتر مؤهل في آخر 30 يوماً."
-                : `المحصّل ${fmtYER(data.collectedTotal)} من ${fmtYER(data.billedTotal)}`
-            }
+            sub={collection === null ? "لا يوجد مبلغ مفوتر مؤهل في آخر 30 يوماً." : `المحصّل ${fmtYER(data.collectedTotal)} من ${fmtYER(data.billedTotal)}`}
             how="المعادلة: مجموع payments المعتمدة المرتبطة بفواتير مؤهلة ÷ مجموع الفواتير المؤهلة ذات reading_id وقيمة صحيحة، في نفس نافذة 30 يوماً × 100. water_bills.status لا يُستخدم كدليل على النقد المحصل. لا يوجد سقف اصطناعي للنسبة."
           />
           <Kpi
             title="الكفاءة التشغيلية"
-            value={
-              data.operationalEfficiency === null
-                ? "غير متاح"
-                : `${data.operationalEfficiency.toFixed(1)}%`
-            }
+            value={data.operationalEfficiency === null ? "غير متاح" : `${data.operationalEfficiency.toFixed(1)}%`}
             icon={<Users className="w-5 h-5" />}
             sub={`${fmtNum(data.approvedReadings)} معتمدة من ${fmtNum(data.readingsTotal)} قراءة`}
             how="المعادلة: عدد القراءات المعتمدة ÷ إجمالي القراءات المسجلة في آخر 30 يوماً × 100. المقام يشمل pending وrejected."
@@ -483,9 +460,7 @@ function Dashboard() {
               <How text="قراءات status='approved' وقيم consumption غير سالبة وصحيحة، مجمعة يومياً حسب created_at." />
             </CardHeader>
             <CardContent className="h-72">
-              {data.consumptionTrend.length === 0 ? (
-                <Empty text="لا توجد قراءات معتمدة كافية في النافذة الزمنية." />
-              ) : (
+              {data.consumptionTrend.length === 0 ? <Empty text="لا توجد قراءات معتمدة كافية في النافذة الزمنية." /> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.consumptionTrend}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -493,14 +468,7 @@ function Dashboard() {
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="consumption"
-                      name="استهلاك (م³)"
-                      stroke="var(--water)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
+                    <Line type="monotone" dataKey="consumption" name="استهلاك (م³)" stroke="var(--water)" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -513,9 +481,7 @@ function Dashboard() {
               <How text="المبلغ المفوتر المؤهل مقابل المدفوعات المعتمدة المرتبطة به، وكلاهما ضمن نافذة 30 يوماً." />
             </CardHeader>
             <CardContent className="h-72">
-              {data.financeTrend.length === 0 ? (
-                <Empty />
-              ) : (
+              {data.financeTrend.length === 0 ? <Empty /> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.financeTrend}>
                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -540,14 +506,12 @@ function Dashboard() {
             </CardHeader>
             <CardContent className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={[
-                    { name: "قراءات", value: data.readingsTotal },
-                    { name: "معتمدة", value: data.approvedReadings },
-                    { name: "فواتير", value: data.eligibleBills },
-                    { name: "مدفوعات", value: data.approvedPayments },
-                  ]}
-                >
+                <BarChart data={[
+                  { name: "قراءات", value: data.readingsTotal },
+                  { name: "معتمدة", value: data.approvedReadings },
+                  { name: "فواتير", value: data.eligibleBills },
+                  { name: "مدفوعات", value: data.approvedPayments },
+                ]}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -564,20 +528,10 @@ function Dashboard() {
               <Badge variant={alerts > 0 ? "destructive" : "secondary"}>{alerts}</Badge>
             </CardHeader>
             <CardContent className="space-y-3">
-              {data.invalidReadings > 0 && (
-                <Alert text={`${data.invalidReadings} قراءة معتمدة بقيمة استهلاك غير صالحة؛ استُبعدت من الاستهلاك.`} />
-              )}
-              {data.inconsistentReadings > 0 && (
-                <Alert text={`${data.inconsistentReadings} قراءة فيها current_reading أقل من previous؛ تحتاج مراجعة.`} />
-              )}
-              {data.collectionDataQuality.map((text) => (
-                <Alert key={text} text={text} />
-              ))}
-              {alerts === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  لا توجد تنبيهات جودة بيانات مؤكدة ضمن نافذة الـ30 يوماً.
-                </p>
-              )}
+              {data.invalidReadings > 0 && <Alert text={`${data.invalidReadings} قراءة معتمدة بقيمة استهلاك غير صالحة؛ استُبعدت من الاستهلاك.`} />}
+              {data.inconsistentReadings > 0 && <Alert text={`${data.inconsistentReadings} قراءة فيها current_reading أقل من previous؛ تحتاج مراجعة.`} />}
+              {data.collectionDataQuality.map((text) => <Alert key={text} text={text} />)}
+              {alerts === 0 && <p className="text-sm text-muted-foreground">لا توجد تنبيهات جودة بيانات مؤكدة ضمن نافذة الـ30 يوماً.</p>}
               <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
                 <span>معلّقة: {fmtNum(data.pendingReadings)}</span>
                 <span>مرفوضة: {fmtNum(data.rejectedReadings)}</span>
@@ -607,14 +561,8 @@ function Dashboard() {
         <Card>
           <CardHeader><CardTitle>بيانات المؤشرات غير المتاحة</CardTitle></CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
-            <DataUnavailable
-              title="كفاءة استخدام المياه"
-              reason="يلزم مصدر موثوق لكمية الإنتاج/الضخ لنفس المشروع والفترة."
-            />
-            <DataUnavailable
-              title="NRW"
-              reason="يلزم مصدر موثوق لمياه النظام الداخلة/الإنتاج. لم يتم إنشاء أو اختلاق بيانات بديلة."
-            />
+            <DataUnavailable title="كفاءة استخدام المياه" reason="يلزم مصدر موثوق لكمية الإنتاج/الضخ لنفس المشروع والفترة." />
+            <DataUnavailable title="NRW" reason="يلزم مصدر موثوق لمياه النظام الداخلة/الإنتاج. لم يتم إنشاء أو اختلاق بيانات بديلة." />
           </CardContent>
         </Card>
       </div>
@@ -657,13 +605,7 @@ function DataUnavailable({ title, reason }: { title: string; reason: string }) {
   );
 }
 
-function Kpi({
-  title,
-  value,
-  icon,
-  sub,
-  how,
-}: {
+function Kpi({ title, value, icon, sub, how }: {
   title: string;
   value: string;
   icon: React.ReactNode;
@@ -682,10 +624,7 @@ function Kpi({
             <div className="mt-2 text-xl md:text-2xl font-bold">{value}</div>
             {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
           </div>
-          <div
-            className="w-10 h-10 shrink-0 rounded-lg grid place-items-center"
-            style={{ background: "var(--water-soft)", color: "var(--water)" }}
-          >
+          <div className="w-10 h-10 shrink-0 rounded-lg grid place-items-center" style={{ background: "var(--water-soft)", color: "var(--water)" }}>
             {icon}
           </div>
         </div>
