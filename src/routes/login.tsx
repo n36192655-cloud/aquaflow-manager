@@ -58,7 +58,10 @@ function LoginPage() {
                     <button
                       key={r.value}
                       type="button"
-                      onClick={() => setRole(r.value)}
+                      onClick={() => {
+                        setRole(r.value);
+                        setName(r.username);
+                      }}
                       className={`text-right p-3 rounded-lg border transition-colors flex items-start gap-3 ${
                         active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                       }`}
