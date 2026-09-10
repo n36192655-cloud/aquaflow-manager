@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
-import { useStore } from "@/lib/store";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,343 +7,121 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2, Camera, MapPin, ShieldAlert, Check, X, Image as ImageIcon, WifiOff } from "lucide-react";
-import { priceFor, fmtYER } from "@/lib/pricing";
+import { AlertCircle, CheckCircle2, Camera, MapPin, ShieldAlert, Image as ImageIcon, WifiOff, RefreshCw } from "lucide-react";
+import { fmtYER, priceFor } from "@/lib/pricing";
 import { MeterCamera, type OcrResult } from "@/components/meter-camera";
-import { useOnlineStatus, addPending } from "@/lib/sync";
+import { addPending, syncPending, useOnlineStatus, usePendingCount } from "@/lib/sync";
 import { useAuth } from "@/lib/auth";
-import { SubscriberSearch } from "@/components/subscriber-search";
 import { getGeoFix, type GeoFix } from "@/lib/geolocation";
+import { listMetersAndCustomers, listReadings, listBills, getLatestApprovedReading, recordReading, type DbMeter, type DbCustomer, type DbReading, type DbBill } from "@/lib/authoritative";
+import { supabase } from "@/lib/supabase";
 
-export const Route = createFileRoute("/readings")({
-  head: () => ({ meta: [{ title: "القراءات — ميزان" }] }),
-  component: ReadingsPage,
-});
+export const Route = createFileRoute("/readings")({ head: () => ({ meta: [{ title: "القراءات — ميزان" }] }), component: ReadingsPage });
 
 function ReadingsPage() {
-  const { meters, readings, customers, bills, addReadingWithBill, approveReading, rejectReading } = useStore();
   const { user } = useAuth();
-  const isReader = user?.role === "reader";
   const online = useOnlineStatus();
-  const [meterId, setMeterId] = useState<number | null>(null);
-  const [current, setCurrent] = useState<string>("");
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [photo, setPhoto] = useState<string | undefined>(undefined);
-  const [ocrSerial, setOcrSerial] = useState<string | undefined>(undefined);
-  const [geoBusy, setGeoBusy] = useState(false);
+  const pendingOffline = usePendingCount();
+  const [meters, setMeters] = useState<DbMeter[]>([]);
+  const [customers, setCustomers] = useState<DbCustomer[]>([]);
+  const [readings, setReadings] = useState<DbReading[]>([]);
+  const [bills, setBills] = useState<DbBill[]>([]);
+  const [meterId, setMeterId] = useState("");
+  const [query, setQuery] = useState("");
+  const [current, setCurrent] = useState("");
+  const [photo, setPhoto] = useState<string | undefined>();
+  const [ocrSerial, setOcrSerial] = useState<string | undefined>();
+  const [ocrConfidence, setOcrConfidence] = useState<number | undefined>();
+  const [ocrRawText, setOcrRawText] = useState<string | undefined>();
   const [geo, setGeo] = useState<GeoFix | null>(null);
-  const [tab, setTab] = useState<"input" | "pending" | "log" | "offline_cache">("input");
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [tab, setTab] = useState<"input" | "log">("input");
 
-  const selected = meterId ? meters.find((m) => m.id === meterId) : null;
-  const last = selected ? readings.filter((r) => r.meter_id === selected.id).sort((a, b) => +new Date(b.date) - +new Date(a.date))[0] : null;
-  const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
+  const load = useCallback(async () => {
+    const [{ meters: ms, customers: cs }, rs, bs] = await Promise.all([listMetersAndCustomers(), listReadings(), listBills()]);
+    setMeters(ms); setCustomers(cs); setReadings(rs); setBills(bs);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const channel = supabase.channel("readings-page").on("postgres_changes", { event: "*", schema: "public", table: "water_readings" }, () => void load()).on("postgres_changes", { event: "*", schema: "public", table: "water_bills" }, () => void load()).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [load]);
 
-  const pending = useMemo(
-    () => readings.filter((r) => r.status === "pending").sort((a, b) => +new Date(b.date) - +new Date(a.date)),
-    [readings],
-  );
-
-  function nameParts(name?: string) {
-    const parts = (name ?? "").split(/\s+/).filter(Boolean);
-    return { first: parts[0] ?? "", second: parts[1] ?? "" };
-  }
+  const selected = meters.find((m) => m.id === meterId) ?? null;
+  const customer = selected ? customers.find((c) => c.id === selected.customer_id) ?? null : null;
+  const last = selected ? readings.find((r) => r.meter_id === selected.id && r.status === "approved") ?? null : null;
+  const pending = useMemo(() => readings.filter((r) => r.status === "pending"), [readings]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase().replace(/[\s-]/g, "");
+    return meters.filter((m) => {
+      const c = customers.find((x) => x.id === m.customer_id);
+      if (!q) return true;
+      return m.serial_number.toLowerCase().replace(/[\s-]/g, "").includes(q) || (c?.name ?? "").toLowerCase().includes(query.trim().toLowerCase());
+    }).slice(0, 20);
+  }, [meters, customers, query]);
 
   function handleOcr(res: OcrResult) {
-    setCameraOpen(false);
-    setPhoto(res.imageData);
-    setOcrSerial(res.serial ?? undefined);
+    setCameraOpen(false); setPhoto(res.imageData); setOcrSerial(res.serial ?? undefined); setOcrConfidence(res.confidence); setOcrRawText(res.raw);
+    if (res.serialMatch === "mismatch") { toast.error(`رفض: رقم العداد ${res.serial} لا يطابق ${selected?.serial_number ?? "العداد المحدد"}`); return; }
     if (res.reading != null) setCurrent(String(res.reading));
-
-    if (res.serialMatch === "mismatch") {
-      toast.error(`عدم تطابق: العداد الملتقط ${res.serial} لا يطابق العداد المسجل ${selected?.number}`);
-      return;
-    }
-    if (res.serialMatch === "match") toast.success(`تطابق ✓ رقم العداد ${res.serial}`);
-    else if (res.reading != null) toast.info(`تم التقاط قراءة ${res.reading} — رقم العداد غير مقروء بوضوح`);
+    if (res.confidence < 0.7 || res.reading == null) toast.warning("الثقة غير كافية؛ راجع القراءة وأدخلها يدوياً. لا يوجد تخمين تلقائي.");
   }
 
   async function captureGeo() {
     setGeoBusy(true);
-    try {
-      const fix = await getGeoFix();
-      setGeo(fix);
-      toast.success(`تم تحديد الموقع (${fix.accuracy.toFixed(0)} م)`);
-      return fix;
-    } catch (e) {
-      toast.error(`فشل تحديد الموقع: ${(e as Error).message}`);
-      return null;
-    } finally {
-      setGeoBusy(false);
-    }
+    try { const fix = await getGeoFix(); setGeo(fix); toast.success(`تم تحديد الموقع بدقة تقريبية ${fix.accuracy.toFixed(0)} م`); }
+    catch (e) { toast.error(`فشل تحديد الموقع: ${(e as Error).message}`); }
+    finally { setGeoBusy(false); }
   }
 
   async function saveReading() {
-    if (!selected || current === "") return toast.error("اختر مشتركاً وأدخل القراءة");
-    
-    // التحقق من تطابق الـ OCR برمجياً لحماية المنظومة
-    if (ocrSerial && ocrSerial.replace(/[-\s]/g, "").toUpperCase() !== selected.number.replace(/[-\s]/g, "").toUpperCase()) {
-      return toast.error(`رفض: رقم العداد الملتقط (${ocrSerial}) لا يطابق المسجل (${selected.number})`);
-    }
-
-    // تأمين جلب موقع الـ GPS ميدانياً عبر الهاردوير مباشرة حتى أوفلاين
+    if (!selected) return toast.error("اختر عداداً فعّالاً");
+    const value = Number(current);
+    if (!Number.isFinite(value) || value < 0) return toast.error("القراءة الحالية غير صالحة");
+    if (ocrSerial && ocrSerial.replace(/[-\s]/g, "").toUpperCase() !== selected.serial_number.replace(/[-\s]/g, "").toUpperCase()) return toast.error("رقم العداد المصوّر لا يطابق العداد المحدد");
     let fix = geo;
-    if (!fix) {
-      setGeoBusy(true);
-      try {
-        fix = await getGeoFix();
-        setGeo(fix);
-      } catch (e) {
-        setGeoBusy(false);
-        if (isReader) {
-          return toast.error(`الموقع الجغرافي مطلوب إجبارياً للقارئ: ${(e as Error).message}`);
-        }
+    if (!fix) { setGeoBusy(true); try { fix = await getGeoFix(); setGeo(fix); } catch (e) { if (user?.role === "reader") { setGeoBusy(false); return toast.error(`GPS مطلوب للقارئ: ${(e as Error).message}`); } } finally { setGeoBusy(false); } }
+    const clientId = crypto.randomUUID();
+    const payload = { meterId: selected.id, current: value, imageData: photo, by: user?.name, latitude: fix?.lat ?? 0, longitude: fix?.lng ?? 0, accuracy: fix?.accuracy, ocrSerial, ocrConfidence, ocrRawText, captureSource: photo ? "camera" as const : "manual" as const, clientId };
+    setBusy(true);
+    try {
+      if (!online) {
+        await addPending(payload);
+        toast.warning("أوفلاين: حُفظت العملية في قائمة المزامنة الآمنة، ولن تُعتبر مسجلة حتى يقبلها الخادم.");
+      } else {
+        const result = await recordReading({ meterId: selected.id, current: value, photoUrl: photo, captureSource: payload.captureSource, ocrSerial, ocrConfidence, ocrRawText, clientId, lat: fix?.lat, lng: fix?.lng, accuracy: fix?.accuracy });
+        toast.success(`تم التسجيل في قاعدة البيانات • استهلاك ${result.consumption} • فاتورة ${result.bill_id}`);
+        await load();
       }
-      setGeoBusy(false);
-    }
-
-    // هندسة حالة الأوفلاين: إذا لم يتوفر اتصال بالإنترنت، نقوم بحفظ الإحداثيات والصورة محلياً فوراً
-    if (!online) {
-      addPending({
-        meterId: selected.id,
-        current: +current,
-        by: user?.name,
-        imageData: photo,
-        latitude: fix?.lat ?? 0,
-        longitude: fix?.lng ?? 0
-      });
-      toast.warning("🔒 وضع الأوفلاين: تم حفظ القراءة محلياً مع تثبيت إحداثيات الـ GPS بنجاح. ستُزامَن تلقائياً فور توفر الشبكة.");
       resetForm();
-      return;
-    }
-
-    // الحفظ المباشر أونلاين
-    const { reading, bill } = addReadingWithBill({
-      meterId: selected.id,
-      current: +current,
-      photo,
-      ocrSerial,
-      lat: fix?.lat,
-      lng: fix?.lng,
-      accuracy: fix?.accuracy,
-      by: user?.name,
-    });
-
-    if (reading.flag === "error") toast.error("قراءة خاطئة: أقل من السابقة");
-    else if (reading.flag === "suspicious") toast.warning("قراءة مشبوهة (تفوق 3× المتوسط) — أُرسلت للاعتماد");
-    else if (bill) toast.success(`تم — استهلاك ${reading.consumption} • فاتورة ${bill.serial} بانتظار الاعتماد`);
-    else toast.success(`تم — استهلاك ${reading.consumption}`);
-    resetForm();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "تعذر تسجيل القراءة"); }
+    finally { setBusy(false); }
   }
 
-  function resetForm() {
-    setCurrent("");
-    setPhoto(undefined);
-    setOcrSerial(undefined);
-    setGeo(null);
+  async function retrySync() {
+    setBusy(true);
+    try { const r = await syncPending(); toast.success(`المزامنة: ${r.synced} ناجحة، ${r.failed} فاشلة`); await load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "تعذرت المزامنة"); }
+    finally { setBusy(false); }
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">القراءات</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isReader ? "ابحث عن المشترك، صوّر العداد، وسجّل القراءة" : "إدخال قراءات جديدة ومراجعتها قبل الاعتماد"}
-          </p>
-        </div>
-        {!online && (
-          <Badge variant="destructive" className="animate-pulse gap-1 text-xs">
-            <WifiOff className="w-3 h-3" /> بدون إنترنت (أوفلاين)
-          </Badge>
-        )}
-      </div>
+  function resetForm() { setCurrent(""); setPhoto(undefined); setOcrSerial(undefined); setOcrConfidence(undefined); setOcrRawText(undefined); setGeo(null); }
 
-      <div className="flex gap-2 flex-wrap">
-        <Button size="sm" variant={tab === "input" ? "default" : "outline"} onClick={() => setTab("input")}>إدخال</Button>
-        {!isReader && (
-          <>
-            <Button size="sm" variant={tab === "pending" ? "default" : "outline"} onClick={() => setTab("pending")}>
-              بانتظار الاعتماد {pending.length > 0 && <Badge className="ms-1" variant="secondary">{pending.length}</Badge>}
-            </Button>
-            <Button size="sm" variant={tab === "log" ? "default" : "outline"} onClick={() => setTab("log")}>سجل الكل</Button>
-          </>
-        )}
-      </div>
-
-      {tab === "input" && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>تسجيل قراءة</CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={captureGeo} disabled={geoBusy}>
-                <MapPin className="w-4 h-4 ms-1" /> {geo ? "✓ موقع مسبق" : "تحديد الموقع"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setCameraOpen(true)}>
-                <Camera className="w-4 h-4 ms-1" /> تصوير + OCR
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="mb-1 block">بحث عن المشترك</Label>
-              <SubscriberSearch value={meterId} onChange={(id) => { setMeterId(id); setOcrSerial(undefined); }} />
-            </div>
-
-            {selected && selectedCustomer && (
-              <div className="rounded-lg border p-3 bg-muted/30 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                <Info label="الاسم الأول">{nameParts(selectedCustomer.name).first}</Info>
-                <Info label="الاسم الثاني">{nameParts(selectedCustomer.name).second}</Info>
-                <Info label="رقم العداد"><span className="font-mono" dir="ltr">{selected.number}</span></Info>
-                <Info label="القراءة السابقة"><span className="font-mono">{last?.current ?? 0}</span></Info>
-              </div>
-            )}
-
-            <div className="grid md:grid-cols-3 gap-3 items-end">
-              <div className="md:col-span-2">
-                <Label>القراءة الحالية</Label>
-                <Input type="number" value={current} onChange={(e) => setCurrent(e.target.value)} />
-                {selected && current !== "" && +current > (last?.current ?? 0) && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    الاستهلاك المتوقع: {+current - (last?.current ?? 0)} — {fmtYER(priceFor(selected.type, +current - (last?.current ?? 0)))}
-                  </p>
-                )}
-              </div>
-              <Button onClick={saveReading} size="lg" disabled={geoBusy}>
-                {geoBusy ? "جاري التقاط الإحداثيات..." : "حفظ القراءة"}
-              </Button>
-            </div>
-
-            {(photo || ocrSerial || geo) && (
-              <div className="flex flex-wrap gap-2 text-xs">
-                {photo && <Badge variant="outline" className="gap-1"><ImageIcon className="w-3 h-3" /> صورة ملتقطة</Badge>}
-                {ocrSerial && (
-                  <Badge variant={selected && ocrSerial.replace(/[-\s]/g, "").toUpperCase() === selected.number.replace(/[-\s]/g, "").toUpperCase() ? "default" : "destructive"} className="gap-1">
-                    <ShieldAlert className="w-3 h-3" /> OCR: {ocrSerial}
-                  </Badge>
-                )}
-                {geo && <Badge variant="outline" className="gap-1"><MapPin className="w-3 h-3" /> {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}</Badge>}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <MeterCamera
-        open={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onCapture={handleOcr}
-        expectedSerial={selected?.number ?? null}
-      />
-
-      {tab === "pending" && !isReader && (
-        <Card>
-          <CardHeader><CardTitle>قراءات بانتظار الاعتماد ({pending.length})</CardTitle></CardHeader>
-          <CardContent className="p-4 space-y-3">
-            {pending.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">لا يوجد قراءات معلقة</p>}
-            {pending.map((r) => {
-              const m = meters.find((x) => x.id === r.meter_id);
-              const c = customers.find((x) => x.id === m?.customer_id);
-              const b = bills.find((x) => x.reading_id === r.id);
-              return (
-                <div key={r.id} className="rounded-lg border p-3 grid md:grid-cols-[110px_1fr_auto] gap-3 items-start">
-                  {r.photo ? (
-                    <img src={r.photo} alt="عداد" className="w-full h-24 object-cover rounded-md border" />
-                  ) : (
-                    <div className="w-full h-24 rounded-md border grid place-items-center bg-muted/30 text-muted-foreground">
-                      <ImageIcon className="w-5 h-5" />
-                    </div>
-                  )}
-                  <div className="text-xs space-y-1">
-                    <div className="flex items-center gap-2 text-sm font-semibold">{c?.name} — <span className="font-mono">{m?.number}</span></div>
-                    <div className="text-muted-foreground">قراءة {r.previous} → <span className="text-foreground font-mono">{r.current}</span> · استهلاك {r.consumption}</div>
-                    {b && <div>الفاتورة: <span className="font-mono">{b.serial}</span> · {fmtYER(b.total)} {b.arrears > 0 && <span className="text-destructive">(متأخرات {fmtYER(b.arrears)})</span>}</div>}
-                    <div className="flex gap-2 flex-wrap text-[11px] text-muted-foreground">
-                      {r.ocr_serial && <span>OCR: <span className="font-mono">{r.ocr_serial}</span></span>}
-                      {r.lat != null && r.lng != null && (
-                        <a className="underline hover:text-primary" href={`https://maps.google.com/?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">
-                          <MapPin className="inline w-3 h-3" /> {r.lat.toFixed(4)}, {r.lng.toFixed(4)}
-                        </a>
-                      )}
-                      {r.by && <span>بواسطة: {r.by}</span>}
-                      <span>{new Date(r.date).toLocaleString("ar")}</span>
-                    </div>
-                  </div>
-                  <div className="flex md:flex-col gap-2">
-                    <Button size="sm" onClick={() => { approveReading(r.id); toast.success("تم الاعتماد"); }}>
-                      <Check className="w-3 h-3 ms-1" /> اعتماد
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => { rejectReading(r.id); toast.info("تم الرفض"); }}>
-                      <X className="w-3 h-3 ms-1" /> رفض
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === "log" && !isReader && (
-        <Card>
-          <CardHeader><CardTitle>سجل القراءات ({readings.length})</CardTitle></CardHeader>
-          <CardContent className="p-4 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">التسلسل</TableHead>
-                  <TableHead className="text-right">التاريخ</TableHead>
-                  <TableHead className="text-right">العداد</TableHead>
-                  <TableHead className="text-right">المشترك</TableHead>
-                  <TableHead className="text-right">السابقة</TableHead>
-                  <TableHead className="text-right">الحالية</TableHead>
-                  <TableHead className="text-right">الاستهلاك</TableHead>
-                  <TableHead className="text-right">الحالة</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...readings].sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 200).map((r) => {
-                  const m = meters.find((x) => x.id === r.meter_id);
-                  const c = customers.find((x) => x.id === m?.customer_id);
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-mono text-[11px]">{r.serial}</TableCell>
-                      <TableCell className="text-xs">{new Date(r.date).toLocaleDateString("ar-EG")}</TableCell>
-                      <TableCell className="font-mono">{m?.number}</TableCell>
-                      <TableCell>{c?.name}</TableCell>
-                      <TableCell>{r.previous}</TableCell>
-                      <TableCell>{r.current}</TableCell>
-                      <TableCell className="font-semibold">{r.consumption}</TableCell>
-                      <TableCell>
-                        {r.status === "pending" ? (
-                          <Badge variant="secondary">معلقة</Badge>
-                        ) : r.status === "rejected" ? (
-                          <Badge variant="destructive"><X className="w-3 h-3 ms-1" /> مرفوضة</Badge>
-                        ) : r.flag === "ok" ? (
-                          <Badge variant="outline" className="gap-1 text-water"><CheckCircle2 className="w-3 h-3" /> معتمدة</Badge>
-                        ) : r.flag === "suspicious" ? (
-                          <Badge variant="secondary" className="gap-1"><AlertCircle className="w-3 h-3" /> مشبوهة</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" /> خاطئة</Badge>
-                        )
-                        }
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+  return <div className="space-y-6">
+    <div className="flex justify-between items-start gap-3"><div><h1 className="text-2xl md:text-3xl font-bold">القراءات</h1><p className="text-sm text-muted-foreground mt-1">المسار التشغيلي الموحّد: تصوير أو إدخال يدوي → تحقق → قاعدة البيانات → فاتورة</p></div><div className="flex gap-2">{!online && <Badge variant="destructive" className="gap-1"><WifiOff className="w-3 h-3"/> أوفلاين</Badge>}{pendingOffline > 0 && <Badge variant="secondary">معلّق محلياً: {pendingOffline}</Badge>}<Button variant="outline" onClick={() => void retrySync()} disabled={busy || !online}><RefreshCw className="w-4 h-4 ms-1"/> مزامنة</Button></div></div>
+    <div className="flex gap-2"><Button size="sm" variant={tab === "input" ? "default" : "outline"} onClick={() => setTab("input")}>إدخال</Button><Button size="sm" variant={tab === "log" ? "default" : "outline"} onClick={() => setTab("log")}>سجل قاعدة البيانات ({readings.length})</Button></div>
+    {tab === "input" && <Card><CardHeader><CardTitle>تسجيل قراءة موثقة</CardTitle></CardHeader><CardContent className="space-y-4">
+      <div><Label>العداد</Label><Input placeholder="ابحث باسم المشترك أو رقم العداد" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <div className="border rounded-lg mt-1 max-h-60 overflow-auto">{results.map(m => { const c = customers.find(x => x.id === m.customer_id); return <button key={m.id} type="button" className="w-full text-right p-3 hover:bg-accent border-b" onClick={() => { setMeterId(m.id); setQuery(`${c?.name ?? ""} · ${m.serial_number}`); }}>{c?.name} — <span className="font-mono">{m.serial_number}</span></button>; })}</div>}</div>
+      {selected && <div className="rounded-lg border p-3 bg-muted/30 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"><Info label="المشترك">{customer?.name ?? "—"}</Info><Info label="رقم العداد"><span className="font-mono">{selected.serial_number}</span></Info><Info label="القراءة السابقة"><span className="font-mono">{last?.current_reading ?? 0}</span></Info><Info label="الحالة"><Badge variant="outline">فعّال</Badge></Info></div>}
+      <div className="flex gap-2"><Button variant="outline" onClick={() => void captureGeo()} disabled={geoBusy}><MapPin className="w-4 h-4 ms-1"/> {geo ? `الموقع ${geo.accuracy.toFixed(0)}م` : "تحديد الموقع"}</Button><Button variant="outline" onClick={() => setCameraOpen(true)}><Camera className="w-4 h-4 ms-1"/> تصوير + OCR</Button></div>
+      <div className="grid md:grid-cols-3 gap-3 items-end"><div className="md:col-span-2"><Label>القراءة الحالية</Label><Input inputMode="decimal" type="number" min="0" step="any" value={current} onChange={(e) => setCurrent(e.target.value)} />{selected && current && Number(current) >= (last?.current_reading ?? 0) && <p className="text-[11px] text-muted-foreground mt-1">الاستهلاك المحسوب على الخادم سيبدأ من {last?.current_reading ?? 0}؛ تقدير محلي فقط: {Number(current) - (last?.current_reading ?? 0)} — {fmtYER(priceFor("water", Number(current) - (last?.current_reading ?? 0)))}</p>}</div><Button size="lg" onClick={() => void saveReading()} disabled={busy || geoBusy}>{busy ? "جارٍ الحفظ..." : "حفظ القراءة"}</Button></div>
+      {(photo || ocrSerial || geo) && <div className="flex flex-wrap gap-2 text-xs">{photo && <Badge variant="outline"><ImageIcon className="w-3 h-3 ms-1"/> صورة</Badge>}{ocrSerial && <Badge variant="outline"><ShieldAlert className="w-3 h-3 ms-1"/> OCR: {ocrSerial} ({Math.round((ocrConfidence ?? 0) * 100)}%)</Badge>}{geo && <Badge variant="outline"><MapPin className="w-3 h-3 ms-1"/> {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)}</Badge>}</div>}
+    </CardContent></Card>}
+    <MeterCamera open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={handleOcr} expectedSerial={selected?.serial_number ?? null}/>
+    {tab === "log" && <Card><CardHeader><CardTitle>القراءات من قاعدة البيانات</CardTitle></CardHeader><CardContent className="overflow-auto"><Table><TableHeader><TableRow><TableHead>التاريخ</TableHead><TableHead>العداد</TableHead><TableHead>المشترك</TableHead><TableHead>السابقة</TableHead><TableHead>الحالية</TableHead><TableHead>الاستهلاك</TableHead><TableHead>الحالة</TableHead></TableRow></TableHeader><TableBody>{readings.map(r => { const c = customers.find(x => x.id === r.customer_id); return <TableRow key={r.id}><TableCell className="text-xs">{new Date(r.created_at).toLocaleString("ar-YE")}</TableCell><TableCell className="font-mono">{r.meter_number}</TableCell><TableCell>{c?.name ?? "—"}</TableCell><TableCell>{r.previous}</TableCell><TableCell>{r.current_reading}</TableCell><TableCell className="font-semibold">{r.consumption}</TableCell><TableCell>{r.status === "approved" ? <Badge variant="outline" className="gap-1"><CheckCircle2 className="w-3 h-3"/> معتمدة</Badge> : r.status === "rejected" ? <Badge variant="destructive"><AlertCircle className="w-3 h-3"/> مرفوضة</Badge> : <Badge variant="secondary">معلقة</Badge>}</TableCell></TableRow>})}</TableBody></Table></CardContent></Card>}
+    {pending.length > 0 && <div className="rounded-lg border border-amber-400/40 bg-amber-50/30 p-3 text-sm">توجد {pending.length} قراءة بحالة معلقة في الخادم. لا تُدخل في مؤشرات الاعتماد حتى اعتمادها.</div>}
+  </div>;
 }
-
-function Info({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-[10px]">{label}</div>
-      <div className="text-sm font-medium mt-0.5">{children}</div>
-    </div>
-  );
-}
+function Info({ label, children }: { label: string; children: React.ReactNode }) { return <div><div className="text-muted-foreground text-[10px]">{label}</div><div className="font-medium mt-0.5">{children}</div></div>; }
