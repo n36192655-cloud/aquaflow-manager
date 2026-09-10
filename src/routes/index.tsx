@@ -63,11 +63,19 @@ type PaymentRow = {
   created_at: string;
 };
 
+type ProductionRow = {
+  id: string;
+  production_m3: number;
+  recorded_at: string;
+  capture_source: string;
+};
+
 type Metrics = {
   tenantName: string;
   windowStart: string;
   windowEnd: string;
   approvedConsumption: number;
+  productionInput: number | null;
   waterEfficiency: number | null;
   nrw: number | null;
   approvedPayments: number;
@@ -76,8 +84,10 @@ type Metrics = {
   approvedReadings: number;
   totalReadings: number;
   operationalEfficiency: number | null;
-  productionAvailable: false;
+  productionAvailable: boolean;
+  productionTrend: Array<{ date: string; production: number; consumption: number }>;
   consumptionTrend: Array<{ date: string; value: number }>;
+  nrwTrend: Array<{ date: string; value: number | null }>;
   financialTrend: Array<{ date: string; billed: number; collected: number }>;
   workflow: { pending: number; approved: number; rejected: number };
   alerts: string[];
@@ -88,6 +98,7 @@ const emptyMetrics: Metrics = {
   windowStart: "",
   windowEnd: "",
   approvedConsumption: 0,
+  productionInput: null,
   waterEfficiency: null,
   nrw: null,
   approvedPayments: 0,
@@ -97,7 +108,9 @@ const emptyMetrics: Metrics = {
   totalReadings: 0,
   operationalEfficiency: null,
   productionAvailable: false,
+  productionTrend: [],
   consumptionTrend: [],
+  nrwTrend: [],
   financialTrend: [],
   workflow: { pending: 0, approved: 0, rejected: 0 },
   alerts: [],
@@ -140,13 +153,13 @@ async function loadMetrics(): Promise<Metrics> {
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   endExclusive.setUTCHours(0, 0, 0, 0);
   const endIso = endExclusive.toISOString();
+  const lastDate = new Date(endExclusive.getTime() - 86_400_000);
 
-  // The tenant comes from the authenticated server-authoritative identity, not from client input.
   const { data: tenantId, error: tenantError } = await supabase.rpc("current_tenant_id");
   if (tenantError) throw tenantError;
-  if (!tenantId) throw new Error("لا يوجد مستأجر مرتبط بالحساب المصادق عليه");
+  if (!tenantId) throw new Error("لا يوجد مشروع مرتبط بالحساب المصادق عليه");
 
-  const [tenantResult, readingsResult, billsResult, paymentsResult] = await Promise.all([
+  const [tenantResult, readingsResult, billsResult, paymentsResult, productionResult] = await Promise.all([
     supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
     supabase
       .from("water_readings")
@@ -166,16 +179,24 @@ async function loadMetrics(): Promise<Metrics> {
       .eq("tenant_id", tenantId)
       .gte("created_at", startIso)
       .lt("created_at", endIso),
+    supabase
+      .from("water_production_logs")
+      .select("id,production_m3,recorded_at,capture_source")
+      .eq("tenant_id", tenantId)
+      .gte("recorded_at", startIso)
+      .lt("recorded_at", endIso),
   ]);
 
   if (tenantResult.error) throw tenantResult.error;
   if (readingsResult.error) throw readingsResult.error;
   if (billsResult.error) throw billsResult.error;
   if (paymentsResult.error) throw paymentsResult.error;
+  if (productionResult.error) throw productionResult.error;
 
   const readings = (readingsResult.data ?? []) as ReadingRow[];
   const bills = (billsResult.data ?? []) as BillRow[];
   const payments = (paymentsResult.data ?? []) as PaymentRow[];
+  const production = (productionResult.data ?? []) as ProductionRow[];
   const alerts: string[] = [];
 
   const validReadings = readings.filter(
@@ -184,14 +205,21 @@ async function loadMetrics(): Promise<Metrics> {
       toFiniteNumber(reading.previous) != null &&
       toFiniteNumber(reading.consumption) != null,
   );
-  if (validReadings.length !== readings.length) alerts.push("توجد قراءات بقيم غير صالحة أو غير رقمية ضمن الفترة.");
+  if (validReadings.length !== readings.length) {
+    alerts.push("توجد قراءات بقيم غير صالحة أو غير رقمية ضمن الفترة ولم تُستخدم في مؤشرات الاستهلاك.");
+  }
 
-  const approvedReadings = validReadings.filter((reading) => reading.status === "approved" && Number(reading.consumption) >= 0);
-  const negativeReadings = readings.filter(
-    (reading) => Number(reading.current_reading) < Number(reading.previous) || Number(reading.consumption) < 0,
+  const approvedReadings = validReadings.filter(
+    (reading) => reading.status === "approved" && Number(reading.consumption) >= 0,
   );
+  const negativeReadings = readings.filter((reading) => {
+    const current = toFiniteNumber(reading.current_reading);
+    const previous = toFiniteNumber(reading.previous);
+    const consumption = toFiniteNumber(reading.consumption);
+    return (current != null && previous != null && current < previous) || (consumption != null && consumption < 0);
+  });
   if (negativeReadings.length > 0) {
-    alerts.push(`توجد ${negativeReadings.length} قراءة سالبة/متناقصة ضمن الفترة وتم إبقاؤها ظاهرة كجودة بيانات.`);
+    alerts.push(`توجد ${negativeReadings.length} قراءة سالبة/متناقصة ضمن الفترة؛ لم تُحتسب ضمن الاستهلاك المعتمد.`);
   }
 
   const approvedReadingIds = new Set(approvedReadings.map((reading) => reading.id));
@@ -211,24 +239,61 @@ async function loadMetrics(): Promise<Metrics> {
   const paidBillIds = new Set(approvedPayments.map((payment) => payment.bill_id));
   const paidWithoutLedger = bills.filter((bill) => bill.status === "paid" && !paidBillIds.has(bill.id));
   if (paidWithoutLedger.length > 0) {
-    alerts.push(`توجد ${paidWithoutLedger.length} فاتورة تحمل حالة paid دون وجود قيد دفع معتمد مطابق في payment ledger؛ لم تُحتسب كتحصيل نقدي.`);
+    alerts.push(`توجد ${paidWithoutLedger.length} فاتورة بحالة paid دون قيد دفع معتمد مطابق؛ لم تُحتسب كتحصيل نقدي.`);
   }
 
-  const invalidPayments = payments.filter((payment) => toFiniteNumber(payment.amount) == null || Number(payment.amount) < 0);
+  const invalidPayments = payments.filter((payment) => {
+    const amount = toFiniteNumber(payment.amount);
+    return amount == null || amount < 0;
+  });
   if (invalidPayments.length > 0) alerts.push(`توجد ${invalidPayments.length} دفعة بقيمة غير صالحة.`);
 
-  const unlinkedPayments = payments.filter((payment) => !bills.some((bill) => bill.id === payment.bill_id));
+  const billIds = new Set(bills.map((bill) => bill.id));
+  const unlinkedPayments = payments.filter((payment) => !billIds.has(payment.bill_id));
   if (unlinkedPayments.length > 0) {
-    alerts.push(`توجد ${unlinkedPayments.length} دفعة لا يمكن ربطها بفواتير مرئية ضمن tenant الحالي؛ لم تُحتسب.`);
+    alerts.push(`توجد ${unlinkedPayments.length} دفعة غير مرتبطة بفاتورة مرئية ضمن المشروع الحالي؛ لم تُحتسب.`);
   }
 
-  const dates = buildDateKeys(start, new Date(endExclusive.getTime() - 86_400_000));
+  const validProduction = production.filter((row) => {
+    const value = toFiniteNumber(row.production_m3);
+    return value != null && value > 0 && typeof row.capture_source === "string" && row.capture_source.trim().length > 0;
+  });
+  const productionAvailable = validProduction.length > 0;
+  const productionInput = productionAvailable
+    ? validProduction.reduce((sum, row) => sum + Number(row.production_m3), 0)
+    : null;
+  if (!productionAvailable) {
+    alerts.push("بيانات الإنتاج/الضخ الموثقة غير متوفرة للفترة الحالية؛ لذلك بقيت كفاءة المياه وNRW غير متاحتين.");
+  }
+  const invalidProduction = production.filter((row) => {
+    const value = toFiniteNumber(row.production_m3);
+    return value == null || value < 0 || typeof row.capture_source !== "string" || row.capture_source.trim().length === 0;
+  });
+  if (invalidProduction.length > 0) {
+    alerts.push(`توجد ${invalidProduction.length} سجلات إنتاج/ضخ غير صالحة أو غير موثقة؛ لم تُستخدم في المؤشرات.`);
+  }
+
+  const dates = buildDateKeys(start, lastDate);
   const consumptionTrend = dates.map((date) => ({
     date,
     value: approvedReadings
       .filter((reading) => dateKey(new Date(reading.created_at)) === date)
       .reduce((sum, reading) => sum + Number(reading.consumption), 0),
   }));
+
+  const productionTrend = dates.map((date) => {
+    const productionValue = validProduction
+      .filter((row) => dateKey(new Date(row.recorded_at)) === date)
+      .reduce((sum, row) => sum + Number(row.production_m3), 0);
+    const consumptionValue = consumptionTrend.find((point) => point.date === date)?.value ?? 0;
+    return { date, production: productionValue, consumption: consumptionValue };
+  });
+
+  const nrwTrend = dates.map((date) => {
+    const input = productionTrend.find((point) => point.date === date)?.production ?? 0;
+    const consumption = consumptionTrend.find((point) => point.date === date)?.value ?? 0;
+    return { date, value: input > 0 ? ((input - consumption) / input) * 100 : null };
+  });
 
   const financialTrend = dates.map((date) => ({
     date,
@@ -244,27 +309,41 @@ async function loadMetrics(): Promise<Metrics> {
   const rejected = readings.filter((reading) => reading.status === "rejected").length;
   const approved = readings.filter((reading) => reading.status === "approved").length;
   if (pending > 0 || rejected > 0) {
-    alerts.push(`سير العمل: ${pending} قراءة معلقة و${rejected} قراءة مرفوضة تحتاجان إلى متابعة.`);
+    alerts.push(`سير العمل: ${pending} قراءة معلقة و${rejected} قراءة مرفوضة تحتاج إلى متابعة.`);
   }
 
-  // Dashboard intentionally reads the authoritative Supabase tables directly.
-  // readings.tsx and payments.tsx still use the local Zustand store; this is a
-  // known Source-of-Truth mismatch and is not treated as DB-backed workflow.
+  if (productionAvailable && productionInput != null && productionInput > 0) {
+    const efficiency = (approvedReadings.reduce((sum, reading) => sum + Number(reading.consumption), 0) / productionInput) * 100;
+    const nrw = ((productionInput - approvedReadings.reduce((sum, reading) => sum + Number(reading.consumption), 0)) / productionInput) * 100;
+    if (!Number.isFinite(efficiency) || !Number.isFinite(nrw)) {
+      alerts.push("تعذر حساب مؤشرات الإنتاج والاستهلاك بسبب قيم غير صالحة.");
+    }
+  }
+
   return {
     tenantName: tenantResult.data?.name ?? "المشروع الحالي",
     windowStart: startIso,
     windowEnd: new Date(endExclusive.getTime() - 1).toISOString(),
     approvedConsumption: approvedReadings.reduce((sum, reading) => sum + Number(reading.consumption), 0),
-    waterEfficiency: null,
-    nrw: null,
+    productionInput,
+    waterEfficiency:
+      productionInput != null && productionInput > 0
+        ? (approvedReadings.reduce((sum, reading) => sum + Number(reading.consumption), 0) / productionInput) * 100
+        : null,
+    nrw:
+      productionInput != null && productionInput > 0
+        ? ((productionInput - approvedReadings.reduce((sum, reading) => sum + Number(reading.consumption), 0)) / productionInput) * 100
+        : null,
     approvedPayments: approvedPaymentTotal,
     eligibleBilled,
     collectionRate: eligibleBilled > 0 ? (approvedPaymentTotal / eligibleBilled) * 100 : null,
     approvedReadings: approvedReadings.length,
     totalReadings: readings.length,
     operationalEfficiency: readings.length > 0 ? (approvedReadings.length / readings.length) * 100 : null,
-    productionAvailable: false,
+    productionAvailable,
+    productionTrend,
     consumptionTrend,
+    nrwTrend,
     financialTrend,
     workflow: { pending, approved, rejected },
     alerts,
@@ -277,6 +356,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -299,7 +379,8 @@ function Dashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "water_readings" }, () => void refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "water_bills" }, () => void refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => void refresh())
-      .subscribe();
+      .on("postgres_changes", { event: "*", schema: "public", table: "water_production_logs" }, () => void refresh())
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => {
       void supabase.removeChannel(channel);
     };
@@ -314,28 +395,28 @@ function Dashboard() {
     {
       title: "كفاءة استخدام المياه",
       value: formatPercent(metrics.waterEfficiency),
-      description: "الاستهلاك المعتمد ÷ الإنتاج/الضخ",
+      description: "الاستهلاك المعتمد ÷ مدخل النظام/الإنتاج الموثق × 100",
       icon: <Droplets className="h-5 w-5" />,
-      unavailable: !metrics.productionAvailable,
+      unavailable: metrics.waterEfficiency == null,
     },
     {
       title: "فاقد المياه NRW",
       value: formatPercent(metrics.nrw),
-      description: "(الإنتاج − الاستهلاك المعتمد) ÷ الإنتاج",
+      description: "(مدخل النظام − الاستهلاك المعتمد) ÷ مدخل النظام × 100",
       icon: <TrendingDown className="h-5 w-5" />,
-      unavailable: !metrics.productionAvailable,
+      unavailable: metrics.nrw == null,
     },
     {
-      title: "الاستدامة المالية / نسبة التحصيل",
+      title: "نسبة التحصيل",
       value: formatPercent(metrics.collectionRate),
-      description: "المدفوعات المعتمدة ÷ الفواتير المؤهلة",
+      description: "المدفوعات المعتمدة فعلياً ÷ الفواتير المؤهلة × 100",
       icon: <Wallet className="h-5 w-5" />,
       unavailable: metrics.collectionRate == null,
     },
     {
       title: "الكفاءة التشغيلية",
       value: formatPercent(metrics.operationalEfficiency),
-      description: "القراءات المعتمدة ÷ إجمالي القراءات",
+      description: "القراءات المعتمدة ÷ إجمالي القراءات × 100",
       icon: <CheckCircle2 className="h-5 w-5" />,
       unavailable: metrics.operationalEfficiency == null,
     },
@@ -348,7 +429,7 @@ function Dashboard() {
           <CardContent className="p-8 text-center">
             <ShieldAlert className="mx-auto h-10 w-10 text-muted-foreground" />
             <h1 className="mt-4 text-xl font-bold">لا يوجد مشروع مرتبط بالحساب</h1>
-            <p className="mt-2 text-sm text-muted-foreground">لوحة الاستدامة لا تجمع بيانات عدة مشاريع. يجب ربط الحساب بـ tenant قبل عرض المؤشرات.</p>
+            <p className="mt-2 text-sm text-muted-foreground">لوحة الاستدامة لا تجمع بيانات عدة مشاريع. يجب ربط الحساب بمشروع قبل عرض مؤشرات المشروع.</p>
           </CardContent>
         </Card>
       </div>
@@ -363,9 +444,15 @@ function Dashboard() {
           <h1 className="text-2xl font-bold md:text-3xl">المياه والمال والتشغيل</h1>
           <p className="mt-1 text-sm text-muted-foreground">{metrics.tenantName} · نافذة موحدة: {periodLabel}</p>
         </div>
-        <Button variant="outline" onClick={() => void refresh()} disabled={refreshing} className="gap-2 self-start">
-          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> تحديث البيانات
-        </Button>
+        <div className="flex items-center gap-2 self-start">
+          <Badge variant="outline" className="gap-1">
+            <span className={`h-2 w-2 rounded-full ${live ? "bg-current" : "bg-muted-foreground"}`} />
+            {live ? "مباشر" : "غير متصل لحظياً"}
+          </Badge>
+          <Button variant="outline" onClick={() => void refresh()} disabled={refreshing} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> تحديث
+          </Button>
+        </div>
       </div>
 
       {error && <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
@@ -388,21 +475,12 @@ function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
-          <CardHeader><CardTitle>تنبيه مهم لجودة البيانات</CardTitle></CardHeader>
+          <CardHeader><CardTitle>تنبيهات جودة البيانات</CardTitle></CardHeader>
           <CardContent>
-            {!metrics.productionAvailable && (
-              <div className="rounded-xl border border-dashed p-5">
-                <div className="flex items-start gap-3">
-                  <Waves className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="font-semibold">بيانات الإنتاج/الضخ غير متوفرة للفترة المحددة.</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">لم يتم إنشاء بيانات تقديرية. إدخال سجلات الإنتاج/الضخ الفعلية لنفس tenant والفترة سيُفعّل NRW وكفاءة استخدام المياه ومقارنة الإنتاج مقابل الاستهلاك.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            {metrics.alerts.length > 0 && (
-              <div className="mt-4 space-y-2">
+            {metrics.alerts.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">لا توجد تنبيهات جودة بيانات ضمن النافذة الحالية.</div>
+            ) : (
+              <div className="space-y-2">
                 {metrics.alerts.map((alert) => (
                   <div key={alert} className="flex gap-2 rounded-lg border bg-muted/20 p-3 text-sm">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -413,7 +491,6 @@ function Dashboard() {
             )}
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader><CardTitle>سير العمل</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -442,12 +519,43 @@ function Dashboard() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card><CardHeader><CardTitle>الإنتاج مقابل الاستهلاك</CardTitle></CardHeader><CardContent><ProductionEmptyState /></CardContent></Card>
-        <Card><CardHeader><CardTitle>اتجاه NRW</CardTitle></CardHeader><CardContent><ProductionEmptyState /></CardContent></Card>
+        <Card>
+          <CardHeader><CardTitle>الإنتاج مقابل الاستهلاك</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            {metrics.productionAvailable ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metrics.productionTrend} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatDay} minTickGap={24} />
+                  <YAxis />
+                  <Tooltip labelFormatter={(label) => formatDay(String(label))} formatter={(value: number, name: string) => [`${value.toFixed(2)} م³`, name === "production" ? "الإنتاج/الضخ" : "الاستهلاك"]} />
+                  <Line type="monotone" dataKey="production" name="production" stroke="currentColor" />
+                  <Line type="monotone" dataKey="consumption" name="consumption" stroke="currentColor" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : <ProductionEmptyState />}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>اتجاه NRW</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            {metrics.productionAvailable && metrics.nrwTrend.some((point) => point.value != null) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metrics.nrwTrend} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatDay} minTickGap={24} />
+                  <YAxis />
+                  <Tooltip labelFormatter={(label) => formatDay(String(label))} formatter={(value: number) => [`${value.toFixed(1)}%`, "NRW"]} />
+                  <Line type="monotone" dataKey="value" stroke="currentColor" connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : <ProductionEmptyState />}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><CircleDollarSign className="h-5 w-5" /> المبالغ المفوترة مقابل المحصلة فعلياً</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><CircleDollarSign className="h-5 w-5" /> المفوتر مقابل المحصل فعلياً</CardTitle></CardHeader>
         <CardContent className="h-72">
           {metrics.financialTrend.some((point) => point.billed > 0 || point.collected > 0) ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -465,25 +573,25 @@ function Dashboard() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>حالة سير العمل · pending / approved / rejected</CardTitle></CardHeader>
+        <CardHeader><CardTitle>حالة سير العمل · آخر 30 يوماً</CardTitle></CardHeader>
         <CardContent className="h-72">
           {metrics.totalReadings > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={[metrics.workflow]} margin={{ top: 20, right: 20, left: 20, bottom: 10 }}>
+              <BarChart data={[metrics.workflow]} margin={{ top: 20, right: 20, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey={() => "آخر 30 يوماً"} />
+                <XAxis dataKey={() => "النافذة الحالية"} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Line type="monotone" dataKey="pending" name="معلقة" stroke="currentColor" />
-                <Line type="monotone" dataKey="approved" name="معتمدة" stroke="currentColor" />
-                <Line type="monotone" dataKey="rejected" name="مرفوضة" stroke="currentColor" />
-              </LineChart>
+                <Bar dataKey="pending" name="معلقة" fill="currentColor" fillOpacity={0.35} />
+                <Bar dataKey="approved" name="معتمدة" fill="currentColor" fillOpacity={0.65} />
+                <Bar dataKey="rejected" name="مرفوضة" fill="currentColor" fillOpacity={0.9} />
+              </BarChart>
             </ResponsiveContainer>
           ) : <EmptyChart text="لا توجد قراءات في النافذة الحالية." />}
         </CardContent>
       </Card>
 
-      <div className="text-xs text-muted-foreground">مصدر لوحة الاستدامة: Supabase فقط، مع فرض tenant من الهوية الحالية عبر RLS. Realtime يسرّع التحديث لكنه ليس بديلاً عن RLS.</div>
+      <div className="text-xs leading-5 text-muted-foreground">مصدر لوحة الاستدامة: Supabase فقط. tenant يحدد من الهوية عبر current_tenant_id() وتبقى RLS هي طبقة العزل الأمنية؛ Realtime مجرد آلية لتسريع إعادة القراءة ولا يمنح صلاحيات إضافية. لا تستخدم لوحة التحكم Zustand أو localStorage كمصدر حقيقة.</div>
       {loading && <p className="text-center text-xs text-muted-foreground">جارٍ تحميل بيانات آخر 30 يوماً…</p>}
     </div>
   );
@@ -498,5 +606,5 @@ function EmptyChart({ text }: { text: string }) {
 }
 
 function ProductionEmptyState() {
-  return <div className="rounded-xl border border-dashed p-6 text-center"><Waves className="mx-auto h-8 w-8 text-muted-foreground" /><p className="mt-3 font-semibold">غير متاح</p><p className="mt-1 text-sm leading-6 text-muted-foreground">بيانات الإنتاج/الضخ غير متوفرة للفترة المحددة. لم يتم إنشاء بيانات اصطناعية لإظهار المؤشر.</p></div>;
+  return <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed p-6 text-center"><Waves className="h-8 w-8 text-muted-foreground" /><p className="mt-3 font-semibold">غير متاح</p><p className="mt-1 text-sm leading-6 text-muted-foreground">لا توجد سجلات إنتاج/ضخ موثقة وصالحة في آخر 30 يوماً. لم يتم إنشاء بيانات اصطناعية لإظهار المؤشر.</p></div>;
 }
