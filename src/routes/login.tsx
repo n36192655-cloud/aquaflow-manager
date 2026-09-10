@@ -70,6 +70,7 @@ function LoginPage() {
                       <div>
                         <div className="font-semibold text-sm">{ROLE_LABEL[r.value]}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{r.desc}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1 font-mono" dir="ltr">{r.username}</div>
                       </div>
                     </button>
                   );
@@ -78,8 +79,8 @@ function LoginPage() {
             </div>
 
             <div>
-              <Label>الاسم</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="أدخل اسمك" />
+              <Label>اسم المستخدم</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم المستخدم" dir="ltr" />
             </div>
             <div>
               <Label>كلمة المرور</Label>
