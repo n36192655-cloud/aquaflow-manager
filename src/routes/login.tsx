@@ -29,7 +29,7 @@ function LoginPage() {
   useEffect(() => { setMounted(true); }, []);
   const licStatus = mounted ? lic.validate() : "active";
   const [role, setRole] = useState<Role>("admin");
-  const [name, setName] = useState("");
+  const [name, setName] = useState("manager");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
