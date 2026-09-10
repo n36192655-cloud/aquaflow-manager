@@ -1,173 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useStore, TAIZ_DIRECTORATES } from "@/lib/store";
-import type { MeterType } from "@/lib/pricing";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2, Droplets, ShieldCheck } from "lucide-react";
+import { Plus, RefreshCw, Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
-export const Route = createFileRoute("/customers")({
-  head: () => ({ meta: [{ title: "المشتركون — ميزان" }, { name: "description", content: "الإدارة الموحّدة للمشتركين والعدادات." }] }),
-  component: CustomersPage,
-});
-
-interface Form {
-  name: string;
-  phone: string;
-  directorate: string;
-  address: string;
-  meterType: MeterType;
-  meterNumber: string;
-}
-const EMPTY: Form = { name: "", phone: "", directorate: TAIZ_DIRECTORATES[0], address: "", meterType: "water", meterNumber: "" };
-
+export const Route = createFileRoute("/customers")({ head: () => ({ meta: [{ title: "المشتركون — ميزان" }] }), component: CustomersPage });
+type Customer = { id: string; name: string; phone: string | null; address: string | null; pay_account: string | null; status: string; created_at: string };
 function CustomersPage() {
-  const { customers, meters, adminCreateSubscriber, deleteCustomer } = useStore();
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Form>(EMPTY);
-
-  const filtered = customers.filter((c) =>
-    `${c.name} ${c.phone} ${c.directorate ?? ""} ${c.address ?? ""}`.toLowerCase().includes(q.toLowerCase()),
-  );
-
-  function save() {
-    if (!form.name.trim()) return toast.error("الاسم مطلوب");
-    if (!form.phone.trim()) return toast.error("الهاتف مطلوب");
-    if (!form.directorate.trim()) return toast.error("المديرية مطلوبة");
-    if (!form.address.trim()) return toast.error("العنوان التفصيلي مطلوب");
-    if (!form.meterNumber.trim()) return toast.error("رقم العداد الجديد مطلوب");
-    if (meters.some((m) => m.number.toLowerCase() === form.meterNumber.trim().toLowerCase())) {
-      return toast.error("رقم العداد مستخدم مسبقاً");
-    }
-    adminCreateSubscriber({
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      directorate: form.directorate,
-      address: form.address.trim(),
-      meterType: form.meterType,
-      meterNumber: form.meterNumber.trim(),
-    });
-    setForm(EMPTY);
-    setOpen(false);
-    toast.success("تم إنشاء المشترك وتفعيل العداد فوراً");
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">المشتركون</h1>
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-            إدارة موحّدة — الإنشاء صلاحية إدارية حصرية ({customers.length})
-          </p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 ms-1" /> إضافة مشترك جديد</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>مشترك جديد — نموذج موحّد</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>الاسم الكامل *</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </div>
-                <div>
-                  <Label>الهاتف *</Label>
-                  <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-              </div>
-              <div>
-                <Label>المديرية *</Label>
-                <Select value={form.directorate} onValueChange={(v) => setForm({ ...form, directorate: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TAIZ_DIRECTORATES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>العنوان التفصيلي *</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="الحارة، الشارع، أقرب معلم…" />
-              </div>
-              <div>
-                <Label>رقم عداد المياه الجديد *</Label>
-                <Input dir="ltr" value={form.meterNumber} onChange={(e) => setForm({ ...form, meterNumber: e.target.value })} placeholder="مثال: W-1042" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
-              <Button onClick={save}>حفظ وتفعيل</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative mb-4">
-            <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground" />
-            <Input className="ps-9" placeholder="بحث بالاسم، الهاتف، المديرية…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">#</TableHead>
-                  <TableHead className="text-right">الاسم</TableHead>
-                  <TableHead className="text-right">الهاتف</TableHead>
-                  <TableHead className="text-right">المديرية</TableHead>
-                  <TableHead className="text-right">العنوان</TableHead>
-                  <TableHead className="text-right">العدادات</TableHead>
-                  <TableHead className="text-right">حساب السداد</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((c) => {
-                  const cMeters = meters.filter((m) => m.customer_id === c.id);
-                  return (
-                    <TableRow key={c.id}>
-                      <TableCell className="text-muted-foreground">{c.id}</TableCell>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell dir="ltr" className="text-right">{c.phone}</TableCell>
-                      <TableCell>{c.directorate ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">{c.address ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1 flex-wrap">
-                          {cMeters.map((m) => (
-                            <Badge key={m.id} variant="outline" className="gap-1">
-                              <Droplets className="w-3 h-3 text-water" />
-                              {m.number}
-                            </Badge>
-                          ))}
-                          {cMeters.length === 0 && <span className="text-xs text-muted-foreground">لا يوجد</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-[11px] text-right">{c.pay_account}</TableCell>
-                      <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => { if (confirm("حذف المشترك وكل عداداته؟")) { deleteCustomer(c.id); toast.success("تم الحذف"); } }}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const { user } = useAuth(); const [customers,setCustomers]=useState<Customer[]>([]); const [q,setQ]=useState(""); const [open,setOpen]=useState(false); const [name,setName]=useState(""); const [phone,setPhone]=useState(""); const [address,setAddress]=useState(""); const [payAccount,setPayAccount]=useState(""); const [busy,setBusy]=useState(false);
+  async function load(){ if(!user?.tenantId)return; const {data,error}=await supabase.from("customers").select("id,name,phone,address,pay_account,status,created_at").eq("tenant_id",user.tenantId).order("created_at",{ascending:false}); if(error)throw error; setCustomers((data??[]) as Customer[]); }
+  useEffect(()=>{void load().catch(e=>toast.error(`تعذر تحميل المشتركين: ${e.message}`));},[user?.tenantId]);
+  const filtered=customers.filter(c=>`${c.name} ${c.phone??""} ${c.address??""} ${c.pay_account??""}`.toLowerCase().includes(q.toLowerCase()));
+  async function create(){if(!name.trim())return toast.error("اسم المشترك مطلوب");setBusy(true);try{const {error}=await supabase.rpc("create_customer",{p_name:name.trim(),p_phone:phone.trim()||null,p_address:address.trim()||null,p_pay_account:payAccount.trim()||null});if(error)throw error;toast.success("تم تسجيل المشترك في قاعدة البيانات");setName("");setPhone("");setAddress("");setPayAccount("");setOpen(false);await load();}catch(e){toast.error(`فشل إنشاء المشترك: ${(e as Error).message}`)}finally{setBusy(false)}}
+  async function deactivate(id:string){if(!window.confirm("إيقاف المشترك؟ لن تُحذف الفواتير والقراءات السابقة."))return;setBusy(true);try{const {error}=await supabase.rpc("deactivate_customer",{p_customer_id:id});if(error)throw error;toast.success("تم إيقاف المشترك");await load()}catch(e){toast.error(`فشل الإيقاف: ${(e as Error).message}`)}finally{setBusy(false)}}
+  return <div className="space-y-6" dir="rtl"><div className="flex items-start justify-between gap-3"><div><h1 className="text-2xl md:text-3xl font-bold">المشتركون</h1><p className="text-sm text-muted-foreground mt-1">السجل الحقيقي للمشتركين في قاعدة البيانات الحالية.</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={()=>void load()}><RefreshCw className="w-4 h-4 ms-1"/> تحديث</Button><Button onClick={()=>setOpen(true)}><Plus className="w-4 h-4 ms-1"/> إضافة مشترك</Button></div></div>
+    <div className="flex items-center gap-2"><Search className="w-4 h-4 text-muted-foreground"/><Input value={q} onChange={e=>setQ(e.target.value)} placeholder="بحث بالاسم أو الهاتف أو العنوان"/></div>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/> السجل ({filtered.length})</CardTitle></CardHeader><CardContent className="overflow-auto">{filtered.length===0?<p className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج.</p>:<table className="w-full text-sm"><thead><tr className="border-b text-right"><th className="p-2">الاسم</th><th className="p-2">الهاتف</th><th className="p-2">العنوان</th><th className="p-2">حساب السداد</th><th className="p-2">الحالة</th><th className="p-2"></th></tr></thead><tbody>{filtered.map(c=><tr key={c.id} className="border-b"><td className="p-2 font-medium">{c.name}</td><td className="p-2">{c.phone??"—"}</td><td className="p-2">{c.address??"—"}</td><td className="p-2 font-mono">{c.pay_account??"—"}</td><td className="p-2"><Badge variant={c.status==="active"?"default":"secondary"}>{c.status==="active"?"فعّال":"موقوف"}</Badge></td><td className="p-2">{c.status==="active"&&<Button size="sm" variant="outline" onClick={()=>void deactivate(c.id)} disabled={busy}>إيقاف</Button>}</td></tr>)}</tbody></table>}</CardContent></Card>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>إضافة مشترك حقيقي</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>الاسم</Label><Input value={name} onChange={e=>setName(e.target.value)}/></div><div><Label>الهاتف</Label><Input value={phone} onChange={e=>setPhone(e.target.value)}/></div><div><Label>العنوان</Label><Input value={address} onChange={e=>setAddress(e.target.value)}/></div><div><Label>حساب السداد (اختياري)</Label><Input value={payAccount} onChange={e=>setPayAccount(e.target.value)}/></div></div><DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>إلغاء</Button><Button onClick={()=>void create()} disabled={busy}>{busy?"جاري الحفظ...":"حفظ"}</Button></DialogFooter></DialogContent></Dialog>
+  </div>;
 }
