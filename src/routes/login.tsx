@@ -75,7 +75,7 @@ function LoginPage() {
               {LOGIN_PRESETS.map((account) => {
                 const Icon = account.icon;
                 const selected = username === account.username;
-                return <Button key={account.username} type="button" variant={selected ? "default" : "outline"} className="h-auto min-h-20 flex-col gap-1 py-3" onClick={() => selectAccount(account)}>
+                return <Button key={account.username} type="button" variant={selected ? "default" : "outline"} aria-pressed={selected} className="h-auto min-h-20 flex-col gap-1 py-3" onClick={() => selectAccount(account)}>
                   <Icon className="w-5 h-5" />
                   <span>{account.label}</span>
                 </Button>;
@@ -85,11 +85,22 @@ function LoginPage() {
 
           <div>
             <Label htmlFor="username">اسم المستخدم</Label>
-            <Input id="username" dir="ltr" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="اختر الحساب أو اكتب اسم المستخدم" />
+            <Input
+              id="username"
+              dir="ltr"
+              type="text"
+              autoComplete="username"
+              value={username}
+              readOnly
+              aria-readonly="true"
+              placeholder="اضغط على نوع الحساب أعلاه"
+              className="bg-muted/50 font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">يُحدد تلقائياً حسب الحساب الذي اخترته.</p>
           </div>
           <div>
             <Label htmlFor="password">كلمة المرور</Label>
-            <Input id="password" dir="ltr" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} placeholder="كلمة المرور" />
+            <Input id="password" dir="ltr" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} placeholder="أدخل كلمة المرور" />
           </div>
           <p className="text-xs text-muted-foreground">الأدوار والصلاحيات تُحدد من الحساب في Supabase/RLS ولا يمكن تغييرها من شاشة الدخول.</p>
           <Button className="w-full" size="lg" disabled={busy || !username || !password} onClick={() => void submit()}>{busy ? "جارٍ التحقق…" : "دخول آمن"}</Button>
