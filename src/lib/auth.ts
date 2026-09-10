@@ -22,25 +22,75 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: authIdentifierForUsername(normalizedUsername), password });
       if (error || !data.user) { set({ loginError: "bad_credentials" }); return false; }
-      await useAuth.getState().hydrateFromSupabase(); const u = useAuth.getState().user; if (!u) { set({ loginError: "bad_credentials" }); return false; }
-      const lic = useLicense.getState(); lic.initIfNeeded(); const seat = lic.acquireSeat(u.userId ?? normalizedUsername, u.role);
+      await useAuth.getState().hydrateFromSupabase();
+      const u = useAuth.getState().user;
+      if (!u) { set({ loginError: "bad_credentials" }); return false; }
+      const lic = useLicense.getState();
+      lic.initIfNeeded();
+      const seat = lic.acquireSeat(u.userId ?? normalizedUsername, u.role);
       if (!seat.ok) { await supabase.auth.signOut(); set({ user: null, loginError: seat.reason ?? "invalid" }); return false; }
-      set({ user: { ...u, seatId: seat.seatId }, loginError: null }); return true;
-    } catch (error) { console.error("[Mizan] authentication failed", error); set({ loginError: "not_configured" }); return false; }
+      set({ user: { ...u, seatId: seat.seatId }, loginError: null });
+      return true;
+    } catch (error) {
+      console.error("[Mizan] authentication failed", error);
+      set({ loginError: "not_configured" });
+      return false;
+    }
   },
   changePassword: async (newPassword) => {
     if (newPassword.length < 8) return false;
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     return !error;
   },
-  logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut(); set({ user: null, loginError: null }); },
+  logout: () => {
+    const u = useAuth.getState().user;
+    if (u?.seatId) useLicense.getState().releaseSeat(u.seatId);
+    void supabase.auth.signOut();
+    set({ user: null, loginError: null });
+  },
   hydrateFromSupabase: async () => {
-    const { data: userData } = await supabase.auth.getUser(); const user = userData.user; if (!user) { set({ user: null }); return; }
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("tenant_id, display_name, username").eq("id", user.id).maybeSingle(); if (profileError) throw profileError;
-    const { data: roles, error: roleError } = await supabase.from("user_roles").select("role, tenant_id").eq("user_id", user.id); if (roleError) throw roleError;
-    const isSuperAdmin = (roles ?? []).some((r) => r.role === "super_admin"); const tenantRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === profile?.tenant_id)?.role;
-    let role: Role; if (tenantRole === "reader") role = "reader"; else if (tenantRole === "collector") role = "cashier"; else if (tenantRole === "manager") role = "admin"; else { set({ user: null, loginError: "bad_credentials" }); await supabase.auth.signOut(); return; }
-    set({ user: { name: profile?.display_name ?? profile?.username ?? user.email ?? "مستخدم", username: profile?.username ?? normalizedUsernameFromAuthEmail(user.email), role, userId: user.id, tenantId: profile?.tenant_id ?? undefined, isSuperAdmin }, loginError: null });
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) { set({ user: null }); return; }
+
+    // profiles intentionally contains no username column; derive the operating
+    // username only from the synthetic Auth identifier used at sign-in.
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("tenant_id, display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileError) throw profileError;
+
+    const { data: roles, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role, tenant_id")
+      .eq("user_id", user.id);
+    if (roleError) throw roleError;
+
+    const isSuperAdmin = (roles ?? []).some((r) => r.role === "super_admin");
+    const tenantRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === profile?.tenant_id)?.role;
+    let role: Role;
+    if (tenantRole === "reader") role = "reader";
+    else if (tenantRole === "collector") role = "cashier";
+    else if (tenantRole === "manager") role = "admin";
+    else {
+      set({ user: null, loginError: "bad_credentials" });
+      await supabase.auth.signOut();
+      return;
+    }
+
+    set({
+      user: {
+        name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم",
+        username: normalizedUsernameFromAuthEmail(user.email),
+        role,
+        userId: user.id,
+        tenantId: profile?.tenant_id ?? undefined,
+        isSuperAdmin,
+      },
+      loginError: null,
+    });
   },
   heartbeat: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().touchSeat(u.seatId); },
 }), { name: "mizan-auth-v4" }));
