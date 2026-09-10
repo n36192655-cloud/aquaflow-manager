@@ -1,175 +1,184 @@
 import { useEffect, useState } from "react";
-import { useStore } from "./store";
 import { supabase } from "./supabase";
+import { recordFieldReading } from "./field-ops";
 
-// Pending water-reading queue kept in localStorage so meter readers can
-// keep working in low-connectivity zones. When the browser comes back
-// online we flush the queue to the local store AND broadcast to any
-// other online sessions of the same tenant via Supabase Realtime.
+export type SyncState = "pending" | "syncing" | "failed";
+
 export interface PendingReading {
   clientId: string;
-  meterId: number;
+  tenantId: string;
+  userId: string;
+  meterId: string;
   current: number;
   imageData?: string;
   createdAt: string;
   by?: string;
-  latitude: number;
-  longitude: number;
-  tenantId?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  captureSource: "camera" | "phone" | "manual" | "offline";
+  ocrSerial?: string;
+  ocrConfidence?: number;
+  ocrRawText?: string;
+  state: SyncState;
+  retryCount: number;
+  lastError?: string;
 }
 
-const KEY = "mizan-pending-readings-v1";
+const DB_NAME = "mizan-field-ops-v2";
+const STORE = "pending-readings";
+const VERSION = 1;
 
-function load(): PendingReading[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as PendingReading[]) : [];
-  } catch {
-    return [];
-  }
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") return reject(new Error("IndexedDB is unavailable"));
+    const req = indexedDB.open(DB_NAME, VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: "clientId" });
+        store.createIndex("createdAt", "createdAt", { unique: false });
+        store.createIndex("state", "state", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
+  });
 }
 
-function save(arr: PendingReading[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(arr));
-  window.dispatchEvent(new Event("mizan-pending-updated"));
+async function all(): Promise<PendingReading[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+    req.onsuccess = () => { db.close(); resolve((req.result as PendingReading[]).sort((a,b) => a.createdAt.localeCompare(b.createdAt))); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
 }
 
-export function getPending(): PendingReading[] {
-  return load();
+async function put(item: PendingReading): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE, "readwrite").objectStore(STORE).put(item);
+    req.onsuccess = () => { db.close(); resolve(); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
 }
 
-export function addPending(
-  p: Omit<PendingReading, "clientId" | "createdAt"> & { clientId?: string },
-): PendingReading {
-  const list = load();
+async function remove(clientId: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE, "readwrite").objectStore(STORE).delete(clientId);
+    req.onsuccess = () => { db.close(); resolve(); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+
+export async function getPending(): Promise<PendingReading[]> { return all(); }
+
+export async function addPending(input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & { clientId?: string }): Promise<PendingReading> {
   const item: PendingReading = {
-    ...p,
-    clientId: p.clientId ?? `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    ...input,
+    clientId: input.clientId ?? `reading_${crypto.randomUUID()}`,
     createdAt: new Date().toISOString(),
+    state: "pending",
+    retryCount: 0,
   };
-  save([...list, item]);
+  await put(item);
+  window.dispatchEvent(new Event("mizan-pending-updated"));
   return item;
 }
 
-export function removePending(clientId: string) {
-  save(load().filter((p) => p.clientId !== clientId));
+export async function removePending(clientId: string) {
+  await remove(clientId);
+  window.dispatchEvent(new Event("mizan-pending-updated"));
 }
 
-export function syncPending(): { synced: number } {
-  const list = load();
-  if (!list.length) return { synced: 0 };
-
-  const store = useStore.getState();
-  let n = 0;
-  const remaining: PendingReading[] = [];
-
-  for (const p of list) {
-    try {
-      store.addReadingWithBill({
-        meterId: p.meterId,
-        current: p.current,
-        photo: p.imageData,
-        by: p.by,
-        lat: p.latitude,
-        lng: p.longitude,
-      });
-      // Fire-and-forget realtime broadcast so the Manager dashboard and
-      // Collector bills view update instantly on all connected devices.
-      if (p.tenantId) {
-        void broadcastTenantEvent(p.tenantId, "reading", {
-          meterId: p.meterId,
-          current: p.current,
-          by: p.by,
-          at: new Date().toISOString(),
-        });
-      }
-      n++;
-    } catch (error) {
-      console.error("[Mizan] pending reading sync failed:", error);
-      remaining.push(p);
-    }
-  }
-
-  save(remaining);
-  return { synced: n };
-}
-
-// ─── Supabase Realtime broadcast ────────────────────────────────────────────
-// Cheap tenant-scoped broadcasts (no DB write per message). Managers and
-// collectors listening to `tenant:<id>` receive updates instantly.
-export type TenantEventType = "reading" | "bill" | "payment";
-
-export async function broadcastTenantEvent(
-  tenantId: string,
-  type: TenantEventType,
-  payload: Record<string, unknown>,
-) {
+function dataUrlToBlob(dataUrl: string): Blob | null {
   try {
-    const channel = supabase.channel(`tenant:${tenantId}`);
-    await channel.subscribe();
-    await channel.send({ type: "broadcast", event: type, payload });
-    await supabase.removeChannel(channel);
-  } catch (err) {
-    console.warn("[Mizan] broadcast failed:", err);
-  }
+    const [meta, body] = dataUrl.split(",");
+    if (!meta || !body) return null;
+    const bytes = atob(body);
+    const arr = new Uint8Array(bytes.length);
+    for (let i=0;i<bytes.length;i++) arr[i] = bytes.charCodeAt(i);
+    return new Blob([arr], { type: meta.match(/data:([^;]+)/)?.[1] ?? "image/jpeg" });
+  } catch { return null; }
 }
 
-export function subscribeToTenantEvents(
-  tenantId: string,
-  onEvent: (type: TenantEventType, payload: Record<string, unknown>) => void,
-) {
-  const channel = supabase.channel(`tenant:${tenantId}`);
-  (["reading", "bill", "payment"] as const).forEach((event) => {
-    channel.on("broadcast", { event }, (msg) =>
-      onEvent(event, (msg.payload ?? {}) as Record<string, unknown>),
-    );
-  });
-  channel.subscribe();
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+async function uploadOfflineImage(item: PendingReading): Promise<string | undefined> {
+  if (!item.imageData) return undefined;
+  const blob = dataUrlToBlob(item.imageData);
+  if (!blob) throw new Error("Invalid offline image");
+  const path = `${item.tenantId}/${item.userId}/${item.clientId}.jpg`;
+  const { error } = await supabase.storage.from("meter-readings").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
+  if (error && !/already exists/i.test(error.message)) throw error;
+  const { data } = supabase.storage.from("meter-readings").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+let syncRunning = false;
+export async function syncPending(): Promise<{ synced: number; failed: number }> {
+  if (syncRunning || typeof navigator === "undefined" || !navigator.onLine) return { synced: 0, failed: 0 };
+  syncRunning = true;
+  let synced = 0, failed = 0;
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    const uid = session.session?.user.id;
+    if (!uid) return { synced: 0, failed: 0 };
+    for (const item of await all()) {
+      if (item.userId !== uid || item.state === "syncing") continue;
+      await put({ ...item, state: "syncing", lastError: undefined });
+      try {
+        const photoUrl = await uploadOfflineImage(item);
+        await recordFieldReading({
+          meterId: item.meterId,
+          current: item.current,
+          photoUrl,
+          captureSource: "offline",
+          ocrSerial: item.ocrSerial,
+          ocrConfidence: item.ocrConfidence,
+          ocrRawText: item.ocrRawText,
+          clientId: item.clientId,
+          lat: item.latitude,
+          lng: item.longitude,
+          accuracy: item.accuracy,
+        });
+        await remove(item.clientId);
+        synced++;
+      } catch (e) {
+        const retryCount = item.retryCount + 1;
+        await put({ ...item, state: "failed", retryCount, lastError: e instanceof Error ? e.message : "Sync failed" });
+        failed++;
+      }
+    }
+  } finally {
+    syncRunning = false;
+    window.dispatchEvent(new Event("mizan-pending-updated"));
+  }
+  return { synced, failed };
 }
 
 export function useOnlineStatus() {
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
-
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   useEffect(() => {
-    const on = () => {
-      setOnline(true);
-      setTimeout(() => {
-        const result = syncPending();
-        if (result.synced > 0) {
-          console.log(`[Mizan] synced ${result.synced} pending readings.`);
-        }
-      }, 1000);
-    };
+    const on = () => { setOnline(true); void syncPending(); };
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
+    const timer = window.setInterval(() => { if (navigator.onLine) void syncPending(); }, 30000);
+    void syncPending();
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); window.clearInterval(timer); };
   }, []);
-
   return online;
 }
 
 export function usePendingCount() {
-  const [count, setCount] = useState<number>(0);
+  const [count, setCount] = useState(0);
   useEffect(() => {
-    const refresh = () => setCount(load().length);
+    const refresh = () => void getPending().then((x) => setCount(x.length));
     refresh();
     window.addEventListener("mizan-pending-updated", refresh);
     window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener("mizan-pending-updated", refresh);
-      window.removeEventListener("storage", refresh);
-    };
+    return () => { window.removeEventListener("mizan-pending-updated", refresh); window.removeEventListener("storage", refresh); };
   }, []);
   return count;
 }
