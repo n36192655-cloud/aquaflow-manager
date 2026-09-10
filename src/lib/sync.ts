@@ -25,7 +25,7 @@ export interface PendingReading {
   lastError?: string;
 }
 
-const DB_NAME = "mizan-field-ops-v2";
+const DB_NAME = "mizan-field-ops-v3";
 const STORE = "pending-readings";
 const VERSION = 1;
 
@@ -39,6 +39,7 @@ function openDb(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE, { keyPath: "clientId" });
         store.createIndex("createdAt", "createdAt", { unique: false });
         store.createIndex("state", "state", { unique: false });
+        store.createIndex("userId", "userId", { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -50,7 +51,10 @@ async function all(): Promise<PendingReading[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const req = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
-    req.onsuccess = () => { db.close(); resolve((req.result as PendingReading[]).sort((a,b) => a.createdAt.localeCompare(b.createdAt))); };
+    req.onsuccess = () => {
+      db.close();
+      resolve((req.result as PendingReading[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    };
     req.onerror = () => { db.close(); reject(req.error); };
   });
 }
@@ -75,7 +79,9 @@ async function remove(clientId: string): Promise<void> {
 
 export async function getPending(): Promise<PendingReading[]> { return all(); }
 
-export async function addPending(input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & { clientId?: string }): Promise<PendingReading> {
+export async function addPending(
+  input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & { clientId?: string },
+): Promise<PendingReading> {
   const item: PendingReading = {
     ...input,
     clientId: input.clientId ?? `reading_${crypto.randomUUID()}`,
@@ -99,9 +105,11 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
     if (!meta || !body) return null;
     const bytes = atob(body);
     const arr = new Uint8Array(bytes.length);
-    for (let i=0;i<bytes.length;i++) arr[i] = bytes.charCodeAt(i);
+    for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
     return new Blob([arr], { type: meta.match(/data:([^;]+)/)?.[1] ?? "image/jpeg" });
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function uploadOfflineImage(item: PendingReading): Promise<string | undefined> {
@@ -109,17 +117,20 @@ async function uploadOfflineImage(item: PendingReading): Promise<string | undefi
   const blob = dataUrlToBlob(item.imageData);
   if (!blob) throw new Error("Invalid offline image");
   const path = `${item.tenantId}/${item.userId}/${item.clientId}.jpg`;
-  const { error } = await supabase.storage.from("meter-readings").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: false });
+  const { error } = await supabase.storage.from("meter-readings").upload(path, blob, {
+    contentType: blob.type || "image/jpeg",
+    upsert: false,
+  });
   if (error && !/already exists/i.test(error.message)) throw error;
-  const { data } = supabase.storage.from("meter-readings").getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 let syncRunning = false;
 export async function syncPending(): Promise<{ synced: number; failed: number }> {
   if (syncRunning || typeof navigator === "undefined" || !navigator.onLine) return { synced: 0, failed: 0 };
   syncRunning = true;
-  let synced = 0, failed = 0;
+  let synced = 0;
+  let failed = 0;
   try {
     const { data: session } = await supabase.auth.getSession();
     const uid = session.session?.user.id;
@@ -128,11 +139,11 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
       if (item.userId !== uid || item.state === "syncing") continue;
       await put({ ...item, state: "syncing", lastError: undefined });
       try {
-        const photoUrl = await uploadOfflineImage(item);
+        const photoPath = await uploadOfflineImage(item);
         await recordFieldReading({
           meterId: item.meterId,
           current: item.current,
-          photoUrl,
+          photoUrl: photoPath,
           captureSource: "offline",
           ocrSerial: item.ocrSerial,
           ocrConfidence: item.ocrConfidence,
@@ -143,11 +154,11 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
           accuracy: item.accuracy,
         });
         await remove(item.clientId);
-        synced++;
+        synced += 1;
       } catch (e) {
         const retryCount = item.retryCount + 1;
         await put({ ...item, state: "failed", retryCount, lastError: e instanceof Error ? e.message : "Sync failed" });
-        failed++;
+        failed += 1;
       }
     }
   } finally {
@@ -166,7 +177,11 @@ export function useOnlineStatus() {
     window.addEventListener("offline", off);
     const timer = window.setInterval(() => { if (navigator.onLine) void syncPending(); }, 30000);
     void syncPending();
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); window.clearInterval(timer); };
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+      window.clearInterval(timer);
+    };
   }, []);
   return online;
 }
@@ -177,8 +192,7 @@ export function usePendingCount() {
     const refresh = () => void getPending().then((x) => setCount(x.length));
     refresh();
     window.addEventListener("mizan-pending-updated", refresh);
-    window.addEventListener("storage", refresh);
-    return () => { window.removeEventListener("mizan-pending-updated", refresh); window.removeEventListener("storage", refresh); };
+    return () => window.removeEventListener("mizan-pending-updated", refresh);
   }, []);
   return count;
 }
