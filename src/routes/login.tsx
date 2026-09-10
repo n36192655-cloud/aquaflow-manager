@@ -15,10 +15,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-const ROLES: { value: Role; icon: typeof ShieldCheck; desc: string }[] = [
-  { value: "admin", icon: ShieldCheck, desc: "لوحة التحكم والإحصائيات والمساعد الذكي" },
-  { value: "reader", icon: Camera, desc: "تصوير العدادات وإدخال القراءات ميدانياً" },
-  { value: "cashier", icon: Wallet, desc: "استلام الدفعات النقدية وإصدار السندات" },
+const ROLES: { value: Role; username: string; icon: typeof ShieldCheck; desc: string }[] = [
+  { value: "admin", username: "manager", icon: ShieldCheck, desc: "لوحة التحكم والإحصائيات والمساعد الذكي" },
+  { value: "cashier", username: "cashier", icon: Wallet, desc: "استلام الدفعات النقدية وإصدار السندات" },
+  { value: "reader", username: "reader", icon: Camera, desc: "تصوير العدادات وإدخال القراءات ميدانياً" },
 ];
 
 function LoginPage() {
