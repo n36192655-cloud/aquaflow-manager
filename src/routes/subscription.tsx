@@ -23,34 +23,36 @@ function SubscriptionPage() {
   
   const [formTenantId, setFormTenantId] = useState("");
   const [formKey, setFormKey] = useState("");
-  const [formSeats, setFormSeats] = useState(3); // 3 أجهزة افتراضياً للعميل الحالي
+  const [formSeats, setFormSeats] = useState(3);
 
-  // فحص حالة العميل حياً من السيرفر بمجرد فتح الشاشة
   useEffect(() => {
     lic.initIfNeeded();
     lic.validateRemote().then((status) => {
       setCurrentStatus(status);
     });
-  }, []);
 
-  function unlockAdminPanel() {
-    const password = prompt("🔒 يرجى إدخال رمز المطور (Indicatorz Master Key) لفتح لوحة الصيانة والتحكم عن بعد:");
-    if (password !== "indicatorz@2026") {
-      toast.error("رمز المطور غير صحيح!");
-      return;
-    }
-    setIsAdminUnlocked(true);
-    toast.success("🔐 تم تفعيل صلاحيات الإدارة السحابية الموحدة");
-  }
+    let cancelled = false;
+    supabase.rpc("is_super_admin").then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        setIsAdminUnlocked(false);
+        return;
+      }
+      setIsAdminUnlocked(data === true);
+    });
 
-  // Toggles the tenant subscription between active and suspended (super-admin only).
+    return () => {
+      cancelled = true;
+    };
+  }, [lic]);
+
   async function toggleRemoteBilling() {
     try {
       const nextStatus = lic.billingPaid ? "suspended" : "active";
-      const { error } = await supabase
-        .from("tenants")
-        .update({ subscription_status: nextStatus })
-        .eq("id", lic.tenantId);
+      const { error } = await supabase.rpc("set_tenant_subscription_status", {
+        p_tenant_id: lic.tenantId,
+        p_status: nextStatus,
+      });
 
       if (error) throw error;
 
@@ -62,7 +64,7 @@ function SubscriptionPage() {
       );
       window.location.reload();
     } catch {
-      toast.error("فشل تعديل الحالة السحابية — تحقق من اتصال الإنترنت.");
+      toast.error("فشل تعديل الحالة السحابية — تحقق من صلاحيات المشرف واتصال الإنترنت.");
     }
   }
 
@@ -85,7 +87,7 @@ function SubscriptionPage() {
       setFormKey("");
       window.location.reload();
     } else {
-      toast.error("حدث خطأ أثناء الاتصال بالخادم وتثبيت الترخيص.");
+      toast.error("حدث خطأ أثناء الاتصال بالخادم أو رفضت صلاحيات المشرف التفعيل.");
     }
   }
 
@@ -94,10 +96,11 @@ function SubscriptionPage() {
       <div className="flex-1 grid place-items-center px-4 py-10">
         <div className="w-full max-w-lg space-y-4">
           <Card className="border-border shadow-xl relative overflow-hidden">
-            
-            <button onClick={unlockAdminPanel} className="absolute top-4 left-4 text-muted-foreground/10 hover:text-primary/40 transition-colors">
-              <KeyRound className="w-4 h-4" />
-            </button>
+            {isAdminUnlocked && (
+              <div className="absolute top-4 left-4 text-primary/40" title="Super-admin authenticated">
+                <KeyRound className="w-4 h-4" />
+              </div>
+            )}
 
             <CardHeader className="text-center">
               <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2 bg-primary/10">
@@ -141,8 +144,8 @@ function SubscriptionPage() {
                     <Button size="sm" variant={showActivationForm ? "default" : "outline"} onClick={() => setShowActivationForm(!showActivationForm)}>
                       {showActivationForm ? "إغلاق نموذج التفعيل" : "🚀 إنشاء رخصة سحابية لعميل"}
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={toggleRemoteBilling}>
-                      {lic.billingPaid ? "🛑 إيقاف الـ 3 أجهزة فوراً عن بُعد" : "✅ إعادة تشغيل الأجهزة"}
+                    <Button size="sm" variant="destructive" onClick={toggleRemoteBilling} disabled={!lic.tenantId}>
+                      {lic.billingPaid ? "🛑 إيقاف الأجهزة فوراً عن بُعد" : "✅ إعادة تشغيل الأجهزة"}
                     </Button>
                   </div>
 
@@ -157,11 +160,11 @@ function SubscriptionPage() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-muted-foreground">مفتاح ترخيص النظام الموحد</Label>
-                        <Input value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="مثال: KEY-3DEVICES-VALID" className="h-9 text-left font-mono" />
+                        <Input value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="أدخل مفتاح الترخيص الصادر للعميل" className="h-9 text-left font-mono" />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[11px] font-medium text-muted-foreground">عدد الأجهزة المشتركة في المزامنة</Label>
-                        <Input type="number" value={formSeats} onChange={(e) => setFormSeats(Number(e.target.value))} className="h-9 text-left font-mono" />
+                        <Input type="number" min={1} max={10000} value={formSeats} onChange={(e) => setFormSeats(Number(e.target.value))} className="h-9 text-left font-mono" />
                       </div>
                       <Button size="sm" className="w-full h-9 mt-2 font-medium" onClick={submitActivation}>ربط وتفعيل الأجهزة الثلاثة سحابياً</Button>
                     </div>
