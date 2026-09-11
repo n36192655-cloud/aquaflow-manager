@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLicense, statusLabel, VENDOR_NAME } from "@/lib/license";
+import { useLicense, statusLabel, VENDOR_NAME, type LicenseStatus } from "@/lib/license";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
