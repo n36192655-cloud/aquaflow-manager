@@ -17,6 +17,8 @@ export const Route = createFileRoute("/subscription")({
 
 function SubscriptionPage() {
   const lic = useLicense();
+  const initIfNeeded = useLicense((s) => s.initIfNeeded);
+  const validateRemote = useLicense((s) => s.validateRemote);
   const [currentStatus, setCurrentStatus] = useState<any>("active");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showActivationForm, setShowActivationForm] = useState(false);
@@ -26,8 +28,8 @@ function SubscriptionPage() {
   const [formSeats, setFormSeats] = useState(3);
 
   useEffect(() => {
-    lic.initIfNeeded();
-    lic.validateRemote().then((status) => {
+    initIfNeeded();
+    validateRemote().then((status) => {
       setCurrentStatus(status);
     });
 
@@ -44,7 +46,7 @@ function SubscriptionPage() {
     return () => {
       cancelled = true;
     };
-  }, [lic]);
+  }, [initIfNeeded, validateRemote]);
 
   async function toggleRemoteBilling() {
     try {
@@ -56,7 +58,7 @@ function SubscriptionPage() {
 
       if (error) throw error;
 
-      await lic.validateRemote();
+      await validateRemote();
       toast.success(
         nextStatus === "active"
           ? "تم تنشيط اشتراك المشروع سحابياً"
