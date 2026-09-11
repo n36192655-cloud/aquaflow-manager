@@ -7,11 +7,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Droplets, Users, AlertTriangle, Percent, HelpCircle, RefreshCw } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
-  CartesianGrid, Legend, LineChart, Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  CartesianGrid,
+  Legend,
+  LineChart,
+  Line,
 } from "recharts";
 
 export const Route = createFileRoute("/")({
@@ -19,9 +35,17 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "لوحة تحكم ميزان — إدارة مشاريع المياه" },
-      { name: "description", content: "مؤشرات المشتركين وكفاءة التحصيل والاستهلاك المعتمد وسلامة القراءات لمشروع المياه، محدثة تلقائياً." },
+      {
+        name: "description",
+        content:
+          "مؤشرات المشتركين وكفاءة التحصيل والاستهلاك المعتمد وسلامة القراءات لمشروع المياه، محدثة تلقائياً.",
+      },
       { property: "og:title", content: "لوحة تحكم ميزان — إدارة مشاريع المياه" },
-      { property: "og:description", content: "مؤشرات المشتركين وكفاءة التحصيل والاستهلاك المعتمد وسلامة القراءات لمشروع المياه." },
+      {
+        property: "og:description",
+        content:
+          "مؤشرات المشتركين وكفاءة التحصيل والاستهلاك المعتمد وسلامة القراءات لمشروع المياه.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -56,7 +80,10 @@ async function loadDashboard(): Promise<DashboardData> {
   let tenantId: string | null = null;
   if (uid) {
     const { data: profile } = await supabase
-      .from("profiles").select("tenant_id").eq("id", uid).maybeSingle();
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", uid)
+      .maybeSingle();
     tenantId = profile?.tenant_id ?? null;
   }
 
@@ -65,7 +92,10 @@ async function loadDashboard(): Promise<DashboardData> {
   // RLS already restricts every row to the caller's tenant.
   const [customers, readings, bills, payments] = await Promise.all([
     supabase.from("customers").select("id,status"),
-    supabase.from("water_readings").select("id,consumption,status,flag,created_at").gte("created_at", since),
+    supabase
+      .from("water_readings")
+      .select("id,consumption,status,flag,created_at")
+      .gte("created_at", since),
     supabase.from("water_bills").select("id,total,status,issued_at"),
     supabase.from("payments").select("id,amount,status,bill_id"),
   ]);
@@ -103,7 +133,8 @@ async function loadDashboard(): Promise<DashboardData> {
     paidBills: billRows.filter((b) => b.status === "paid").length,
     unpaidBills: billRows.filter((b) => b.status !== "paid").length,
     overdueBills: billRows.filter(
-      (b) => b.status !== "paid" && b.issued_at && now - new Date(b.issued_at).getTime() > 30 * 86400000,
+      (b) =>
+        b.status !== "paid" && b.issued_at && now - new Date(b.issued_at).getTime() > 30 * 86400000,
     ).length,
     approvedConsumption: approved.reduce((a, b) => a + Number(b.consumption ?? 0), 0),
     approvedReadings: approved.length,
@@ -111,7 +142,9 @@ async function loadDashboard(): Promise<DashboardData> {
     flaggedReadings: flagged.length,
     flagBreakdown: [...flagMap.entries()].map(([name, value]) => ({ name, value })),
     paymentsCount: payRows.length,
-    trend: [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, v]) => ({ day, ...v })),
+    trend: [...dayMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, v]) => ({ day, ...v })),
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -144,7 +177,8 @@ function Dashboard() {
     });
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") setLive("live");
-      else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setLive("off");
+      else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED")
+        setLive("off");
     });
     return () => {
       if (timer) clearTimeout(timer);
@@ -162,7 +196,9 @@ function Dashboard() {
       <div className="space-y-6" dir="rtl">
         <Skeleton className="h-9 w-64" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
         </div>
         <Skeleton className="h-72" />
       </div>
@@ -172,10 +208,14 @@ function Dashboard() {
   if (isError || !data) {
     return (
       <Card dir="rtl">
-        <CardHeader><CardTitle>تعذر تحميل بيانات اللوحة</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>تعذر تحميل بيانات اللوحة</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>{(error as Error)?.message ?? "خطأ غير معروف"}</p>
-          <Button onClick={() => refetch()} size="sm">إعادة المحاولة</Button>
+          <Button onClick={() => refetch()} size="sm">
+            إعادة المحاولة
+          </Button>
         </CardContent>
       </Card>
     );
@@ -184,7 +224,9 @@ function Dashboard() {
   if (!data.tenantId) {
     return (
       <Card dir="rtl">
-        <CardHeader><CardTitle>غير متاح — لا يوجد مشروع مرتبط بحسابك</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>غير متاح — لا يوجد مشروع مرتبط بحسابك</CardTitle>
+        </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           يجب ربط حسابك بمشروع مياه (tenant) لعرض المؤشرات الإنتاجية من قاعدة البيانات.
         </CardContent>
@@ -218,7 +260,11 @@ function Dashboard() {
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant={live === "live" ? "secondary" : "outline"}>
-              {live === "live" ? "تحديث تلقائي مباشر" : live === "connecting" ? "جارٍ الاتصال…" : "التحديث المباشر متوقف"}
+              {live === "live"
+                ? "تحديث تلقائي مباشر"
+                : live === "connecting"
+                  ? "جارٍ الاتصال…"
+                  : "التحديث المباشر متوقف"}
             </Badge>
             <span>آخر تحديث: {new Date(data.fetchedAt).toLocaleTimeString("ar")}</span>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
@@ -230,7 +276,8 @@ function Dashboard() {
         {empty && (
           <Card>
             <CardContent className="p-5 text-sm text-muted-foreground">
-              لا توجد بيانات في قاعدة البيانات لهذا المشروع بعد. ستظهر المؤشرات تلقائياً بعد أول قراءة معتمدة أو فاتورة.
+              لا توجد بيانات في قاعدة البيانات لهذا المشروع بعد. ستظهر المؤشرات تلقائياً بعد أول
+              قراءة معتمدة أو فاتورة.
             </CardContent>
           </Card>
         )}
@@ -246,9 +293,11 @@ function Dashboard() {
             title="كفاءة التحصيل"
             value={collection === null ? "غير متاح" : `${collection.toFixed(1)}%`}
             icon={<Percent className="w-5 h-5" />}
-            sub={collection === null
-              ? "لا توجد فواتير قابلة للحساب"
-              : `المحصّل ${fmtYER(data.collectedTotal)} من المفوتر ${fmtYER(data.billedTotal)}`}
+            sub={
+              collection === null
+                ? "لا توجد فواتير قابلة للحساب"
+                : `المحصّل ${fmtYER(data.collectedTotal)} من المفوتر ${fmtYER(data.billedTotal)}`
+            }
             how="الجداول: water_bills و payments. المعادلة: مجموع payments.amount (status='approved') ÷ مجموع water_bills.total × 100. لا يتم جمع المدفوعات مع الفواتير المدفوعة (لمنع الاحتساب المزدوج). غير متاح إذا كان إجمالي المفوتر = 0."
           />
           <Kpi
@@ -260,9 +309,11 @@ function Dashboard() {
           />
           <Kpi
             title="سلامة القراءات"
-            value={data.approvedReadings + data.pendingReadings + data.flaggedReadings === 0
-              ? "لا توجد بيانات كافية"
-              : `${fmtNum(data.flaggedReadings)} شاذة`}
+            value={
+              data.approvedReadings + data.pendingReadings + data.flaggedReadings === 0
+                ? "لا توجد بيانات كافية"
+                : `${fmtNum(data.flaggedReadings)} شاذة`
+            }
             icon={<AlertTriangle className="w-5 h-5" />}
             highlight={data.flaggedReadings > 0}
             sub={`${fmtNum(data.pendingReadings)} قراءة بانتظار الاعتماد`}
@@ -274,7 +325,9 @@ function Dashboard() {
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>اتجاه الاستهلاك والقراءات المعتمدة</CardTitle>
-              <How text={`الجدول: water_readings (status='approved'). تجميع يومي حسب created_at خلال آخر ${WINDOW_DAYS} يوماً.`} />
+              <How
+                text={`الجدول: water_readings (status='approved'). تجميع يومي حسب created_at خلال آخر ${WINDOW_DAYS} يوماً.`}
+              />
             </CardHeader>
             <CardContent className="h-72">
               {data.trend.length === 0 ? (
@@ -287,8 +340,22 @@ function Dashboard() {
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="consumption" name="استهلاك (م³)" stroke="var(--water)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="readings" name="عدد القراءات" stroke="var(--muted-foreground)" strokeWidth={1.5} dot={false} />
+                    <Line
+                      type="monotone"
+                      dataKey="consumption"
+                      name="استهلاك (م³)"
+                      stroke="var(--water)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="readings"
+                      name="عدد القراءات"
+                      stroke="var(--muted-foreground)"
+                      strokeWidth={1.5}
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -306,7 +373,13 @@ function Dashboard() {
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={collectionPie} dataKey="value" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                    <Pie
+                      data={collectionPie}
+                      dataKey="value"
+                      innerRadius={55}
+                      outerRadius={90}
+                      paddingAngle={2}
+                    >
                       <Cell fill="var(--water)" />
                       <Cell fill="var(--muted-foreground)" />
                       <Cell fill="var(--destructive)" />
@@ -354,7 +427,12 @@ function Dashboard() {
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
                     <Tooltip />
-                    <Bar dataKey="value" name="عدد" fill="var(--destructive)" radius={[4, 4, 4, 4]} />
+                    <Bar
+                      dataKey="value"
+                      name="عدد"
+                      fill="var(--destructive)"
+                      radius={[4, 4, 4, 4]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -363,7 +441,8 @@ function Dashboard() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          مؤشر فاقد المياه (NRW) غير متاح — البيانات المطلوبة (كميات الضخ/الإنتاج) غير موجودة في قاعدة البيانات الحالية.
+          مؤشر فاقد المياه (NRW) غير متاح — البيانات المطلوبة (كميات الضخ/الإنتاج) غير موجودة في
+          قاعدة البيانات الحالية.
         </p>
       </div>
     </TooltipProvider>
@@ -374,7 +453,11 @@ function How({ text }: { text: string }) {
   return (
     <UITooltip>
       <TooltipTrigger asChild>
-        <button type="button" aria-label="كيف حُسب؟" className="text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          aria-label="كيف حُسب؟"
+          className="text-muted-foreground hover:text-foreground"
+        >
           <HelpCircle className="w-4 h-4" />
         </button>
       </TooltipTrigger>
@@ -388,9 +471,19 @@ function Empty({ text = "لا توجد بيانات كافية لعرض هذا �
 }
 
 function Kpi({
-  title, value, icon, sub, how, highlight,
+  title,
+  value,
+  icon,
+  sub,
+  how,
+  highlight,
 }: {
-  title: string; value: string; icon: React.ReactNode; sub?: string; how: string; highlight?: boolean;
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  sub?: string;
+  how: string;
+  highlight?: boolean;
 }) {
   return (
     <Card className={highlight ? "border-destructive/40" : undefined}>
@@ -401,7 +494,11 @@ function Kpi({
               <span className="truncate">{title}</span>
               <How text={how} />
             </div>
-            <div className={`mt-2 text-xl md:text-2xl font-bold ${highlight ? "text-destructive" : ""}`}>{value}</div>
+            <div
+              className={`mt-2 text-xl md:text-2xl font-bold ${highlight ? "text-destructive" : ""}`}
+            >
+              {value}
+            </div>
             {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
           </div>
           <div

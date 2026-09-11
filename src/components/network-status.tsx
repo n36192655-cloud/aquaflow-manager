@@ -13,13 +13,15 @@ export function NetworkStatus() {
     <div className="flex items-center gap-2 text-xs">
       <span
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
-          online ? "bg-emerald-500/15 text-emerald-600" : "bg-destructive/15 text-destructive font-semibold animate-pulse"
+          online
+            ? "bg-emerald-500/15 text-emerald-600"
+            : "bg-destructive/15 text-destructive font-semibold animate-pulse"
         }`}
       >
         {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
         {online ? "متصل بالشبكة" : "وضع الأوفلاين"}
       </span>
-      
+
       {pending > 0 && (
         <>
           <span className="text-muted-foreground bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20 text-amber-700">
@@ -33,25 +35,29 @@ export function NetworkStatus() {
             onClick={() => {
               setSyncing(true);
               toast.loading("جاري ترحيل ومزامنة القراءات الميدانية...", { id: "sync-toast" });
-              
+
               // عمل تأخير بسيط لإعطاء تجربة بصرية ممتازة أثناء الرفع
               setTimeout(() => {
                 try {
                   const { synced } = syncPending();
                   if (synced > 0) {
-                    toast.success(`تم بنجاح ترحيل ومزامنة ${synced} قراءة إلى السيرفر الرئيسي!`, { id: "sync-toast" });
+                    toast.success(`تم بنجاح ترحيل ومزامنة ${synced} قراءة إلى السيرفر الرئيسي!`, {
+                      id: "sync-toast",
+                    });
                   } else {
                     toast.info("لا توجد قراءات صالحة للمزامنة حالياً", { id: "sync-toast" });
                   }
                 } catch (error) {
-                  toast.error("فشلت المزامنة التلقائية، يرجى التحقق من جودة الإشارة", { id: "sync-toast" });
+                  toast.error("فشلت المزامنة التلقائية، يرجى التحقق من جودة الإشارة", {
+                    id: "sync-toast",
+                  });
                 } finally {
                   setSyncing(false);
                 }
               }, 1200);
             }}
           >
-            <RefreshCw className={`w-3 h-3 ms-1 ${syncing ? "animate-spin" : ""}`} /> 
+            <RefreshCw className={`w-3 h-3 ms-1 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "جاري الرفع..." : "مزامنة الآن"}
           </Button>
         </>

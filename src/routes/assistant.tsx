@@ -15,8 +15,14 @@ export const Route = createFileRoute("/assistant")({
   component: AssistantPage,
 });
 
-interface UserMsg { role: "user"; text: string }
-interface AssistantMsg { role: "assistant"; response: AiResponse }
+interface UserMsg {
+  role: "user";
+  text: string;
+}
+interface AssistantMsg {
+  role: "assistant";
+  response: AiResponse;
+}
 type Msg = UserMsg | AssistantMsg;
 
 const SUGGESTIONS = [
@@ -65,7 +71,8 @@ function AssistantPage() {
       const response = answerQuestion(lastUser.text);
       setMessages((m) => {
         const last = m[m.length - 1];
-        if (last && last.role === "assistant") return [...m.slice(0, -1), { role: "assistant", response }];
+        if (last && last.role === "assistant")
+          return [...m.slice(0, -1), { role: "assistant", response }];
         return [...m, { role: "assistant", response }];
       });
     }
@@ -79,7 +86,9 @@ function AssistantPage() {
           <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
             <MizanAiIcon size={32} /> ميزان الذكي
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">مستشار ميزان الرقمي — تحليل ذكي وقرارات فورية</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            مستشار ميزان الرقمي — تحليل ذكي وقرارات فورية
+          </p>
         </div>
       </div>
 
@@ -95,11 +104,19 @@ function AssistantPage() {
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4" ref={boxRef}>
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+              <div
+                className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+              >
                 {m.role === "user" ? <User className="w-4 h-4" /> : <MizanAiIcon size={20} />}
               </div>
-              <div className={`max-w-[90%] ${m.role === "user" ? "rounded-lg px-3 py-2 text-sm bg-primary text-primary-foreground" : "flex-1"}`}>
-                {m.role === "user" ? m.text : <AiResponseRenderer response={m.response} onSuggestion={send} />}
+              <div
+                className={`max-w-[90%] ${m.role === "user" ? "rounded-lg px-3 py-2 text-sm bg-primary text-primary-foreground" : "flex-1"}`}
+              >
+                {m.role === "user" ? (
+                  m.text
+                ) : (
+                  <AiResponseRenderer response={m.response} onSuggestion={send} />
+                )}
               </div>
             </div>
           ))}
@@ -107,14 +124,30 @@ function AssistantPage() {
         <div className="border-t p-3 space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => send(s)} className="text-xs px-2.5 py-1 rounded-full border hover:bg-primary/10 hover:border-primary/40 transition-colors">
+              <button
+                key={s}
+                onClick={() => send(s)}
+                className="text-xs px-2.5 py-1 rounded-full border hover:bg-primary/10 hover:border-primary/40 transition-colors"
+              >
                 {s}
               </button>
             ))}
           </div>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(input); }}>
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="اكتب سؤالك بالعربية…" />
-            <Button type="submit" size="icon"><Send className="w-4 h-4" /></Button>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(input);
+            }}
+          >
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="اكتب سؤالك بالعربية…"
+            />
+            <Button type="submit" size="icon">
+              <Send className="w-4 h-4" />
+            </Button>
           </form>
         </div>
       </Card>

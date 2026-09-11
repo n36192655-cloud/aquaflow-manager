@@ -7,20 +7,38 @@ export function calcConsumption(previous: number, current: number): number {
 export function priceWater(units: number): number {
   if (units <= 0) return 0;
   let total = 0;
-  const t1 = Math.min(units, 10); total += t1 * 100;
-  if (units > 10) { const t2 = Math.min(units - 10, 20); total += t2 * 200; }
-  if (units > 30) { const t3 = Math.min(units - 30, 70); total += t3 * 350; }
-  if (units > 100) { total += (units - 100) * 350; }
+  const t1 = Math.min(units, 10);
+  total += t1 * 100;
+  if (units > 10) {
+    const t2 = Math.min(units - 10, 20);
+    total += t2 * 200;
+  }
+  if (units > 30) {
+    const t3 = Math.min(units - 30, 70);
+    total += t3 * 350;
+  }
+  if (units > 100) {
+    total += (units - 100) * 350;
+  }
   return total;
 }
 
 export function priceElectric(units: number): number {
   if (units <= 0) return 0;
   let total = 0;
-  const t1 = Math.min(units, 100); total += t1 * 15;
-  if (units > 100) { const t2 = Math.min(units - 100, 200); total += t2 * 25; }
-  if (units > 300) { const t3 = Math.min(units - 300, 200); total += t3 * 40; }
-  if (units > 500) { total += (units - 500) * 40; }
+  const t1 = Math.min(units, 100);
+  total += t1 * 15;
+  if (units > 100) {
+    const t2 = Math.min(units - 100, 200);
+    total += t2 * 25;
+  }
+  if (units > 300) {
+    const t3 = Math.min(units - 300, 200);
+    total += t3 * 40;
+  }
+  if (units > 500) {
+    total += (units - 500) * 40;
+  }
   return total;
 }
 

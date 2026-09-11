@@ -29,7 +29,6 @@ interface AuthState {
   hydrateFromSupabase: () => Promise<void>;
 }
 
-
 // Offline-only demo credentials used when the app runs without a Supabase session
 const DEMO_PASSWORD = "1234";
 
@@ -68,7 +67,6 @@ export const useAuth = create<AuthState>()(
         }
         return true;
       },
-
 
       loginWithSupabase: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });

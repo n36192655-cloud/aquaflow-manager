@@ -31,11 +31,11 @@ export function getGeoFix(timeoutMs = 15000): Promise<GeoFix> {
         }
         reject(new Error(errorMsg));
       },
-      { 
+      {
         enableHighAccuracy: true, // إجبار استخدام حساس الهاردوير الميداني
-        timeout: timeoutMs,       // زيادة المهلة إلى 15 ثانية لضمان اللقطة في وضع الأوفلاين
-        maximumAge: 60000         // السماح بقبول قراءة دقيقة مجهزة مسبقاً خلال آخر دقيقة لتسريع الأداء
-      }
+        timeout: timeoutMs, // زيادة المهلة إلى 15 ثانية لضمان اللقطة في وضع الأوفلاين
+        maximumAge: 60000, // السماح بقبول قراءة دقيقة مجهزة مسبقاً خلال آخر دقيقة لتسريع الأداء
+      },
     );
   });
 }

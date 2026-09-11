@@ -6,7 +6,13 @@ export type AiResponse =
   | { kind: "suggestions"; text: string; suggestions: string[] }
   | {
       kind: "subscriber_ledger";
-      customer: { id: number; name: string; phone: string; pay_account: string; directorate?: string };
+      customer: {
+        id: number;
+        name: string;
+        phone: string;
+        pay_account: string;
+        directorate?: string;
+      };
       totals: { paid: number; arrears: number; billed: number };
       series: Array<{ label: string; consumption: number; amount: number }>;
     }
@@ -45,15 +51,16 @@ function weekRange() {
   const start = now.getTime() - 7 * 86400000;
   return { start, end: now.getTime(), label: "آخر 7 أيام" };
 }
-function iso(t: number) { return new Date(t).toISOString().slice(0, 10); }
+function iso(t: number) {
+  return new Date(t).toISOString().slice(0, 10);
+}
 
 function findCustomer(q: string) {
   const s = useStore.getState();
   const clean = q.trim().toLowerCase();
-  return s.customers.find((c) =>
-    c.name.toLowerCase().includes(clean) ||
-    c.phone.includes(clean) ||
-    String(c.id) === clean,
+  return s.customers.find(
+    (c) =>
+      c.name.toLowerCase().includes(clean) || c.phone.includes(clean) || String(c.id) === clean,
   );
 }
 
@@ -78,7 +85,9 @@ export function answerQuestion(q: string): AiResponse {
         suggestions: s.customers.slice(0, 6).map((c) => `استعلام عن مشترك ${c.name}`),
       };
     }
-    const customerBills = s.bills.filter((b) => b.customer_id === target!.id).sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    const customerBills = s.bills
+      .filter((b) => b.customer_id === target!.id)
+      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
     const paid = s.payments
       .filter((p) => p.status === "approved" && customerBills.some((b) => b.id === p.bill_id))
       .reduce((a, p) => a + p.amount, 0);
@@ -94,7 +103,13 @@ export function answerQuestion(q: string): AiResponse {
     });
     return {
       kind: "subscriber_ledger",
-      customer: { id: target.id, name: target.name, phone: target.phone, pay_account: target.pay_account, directorate: target.directorate },
+      customer: {
+        id: target.id,
+        name: target.name,
+        phone: target.phone,
+        pay_account: target.pay_account,
+        directorate: target.directorate,
+      },
       totals: { paid, arrears, billed },
       series,
     };
@@ -105,11 +120,19 @@ export function answerQuestion(q: string): AiResponse {
     const range = has("اليوم") ? todayRange() : has("أسبوع", "اسبوع") ? weekRange() : monthRange();
     const perType = (t: "water" | "electric") => {
       const produced = s.productionLogs
-        .filter((p) => p.type === t && +new Date(p.date) >= range.start && +new Date(p.date) < range.end)
+        .filter(
+          (p) => p.type === t && +new Date(p.date) >= range.start && +new Date(p.date) < range.end,
+        )
         .reduce((a, b) => a + b.units, 0);
       const meterIds = new Set(s.meters.filter((m) => m.type === t).map((m) => m.id));
       const consumed = s.readings
-        .filter((r) => meterIds.has(r.meter_id) && r.status !== "rejected" && +new Date(r.date) >= range.start && +new Date(r.date) < range.end)
+        .filter(
+          (r) =>
+            meterIds.has(r.meter_id) &&
+            r.status !== "rejected" &&
+            +new Date(r.date) >= range.start &&
+            +new Date(r.date) < range.end,
+        )
         .reduce((a, b) => a + b.consumption, 0);
       const loss = Math.max(0, produced - consumed);
       const pct = produced > 0 ? (loss / produced) * 100 : 0;
@@ -118,32 +141,57 @@ export function answerQuestion(q: string): AiResponse {
     const water = perType("water");
     const electric = perType("electric");
     const alerts: string[] = [];
-    if (water.pct > 15) alerts.push(`فاقد المياه ${water.pct.toFixed(1)}% — يُوصى بجولات تفتيش للتسريبات وفحص التوصيلات غير المشروعة في الشبكات عالية الاستهلاك`);
-    if (electric.pct > 15) alerts.push(`فاقد الكهرباء ${electric.pct.toFixed(1)}% — يُوصى بمسح ميداني للتوصيلات المخالفة ومعايرة العدادات`);
+    if (water.pct > 15)
+      alerts.push(
+        `فاقد المياه ${water.pct.toFixed(1)}% — يُوصى بجولات تفتيش للتسريبات وفحص التوصيلات غير المشروعة في الشبكات عالية الاستهلاك`,
+      );
+    if (electric.pct > 15)
+      alerts.push(
+        `فاقد الكهرباء ${electric.pct.toFixed(1)}% — يُوصى بمسح ميداني للتوصيلات المخالفة ومعايرة العدادات`,
+      );
     return {
       kind: "loss_analysis",
       range: { from: iso(range.start), to: iso(range.end - 1) },
-      water, electric, alerts,
+      water,
+      electric,
+      alerts,
     };
   }
 
   // 3) Payment status
   if (has("من دفع", "من لم يدفع", "المدفوع", "غير المدفوع", "المتأخرين", "متأخر", "حالة الدفع")) {
-    const paid = s.bills.filter((b) => b.status === "paid").slice(0, 50).map((b) => {
-      const c = s.customers.find((x) => x.id === b.customer_id);
-      return { id: b.id, name: c?.name ?? "—", serial: b.serial, total: b.total };
-    });
-    const unpaid = s.bills.filter((b) => b.status !== "paid").slice(0, 50).map((b) => {
-      const c = s.customers.find((x) => x.id === b.customer_id);
-      return { id: b.id, name: c?.name ?? "—", serial: b.serial, total: b.total, balance: billBalance(b, s.payments) };
-    });
+    const paid = s.bills
+      .filter((b) => b.status === "paid")
+      .slice(0, 50)
+      .map((b) => {
+        const c = s.customers.find((x) => x.id === b.customer_id);
+        return { id: b.id, name: c?.name ?? "—", serial: b.serial, total: b.total };
+      });
+    const unpaid = s.bills
+      .filter((b) => b.status !== "paid")
+      .slice(0, 50)
+      .map((b) => {
+        const c = s.customers.find((x) => x.id === b.customer_id);
+        return {
+          id: b.id,
+          name: c?.name ?? "—",
+          serial: b.serial,
+          total: b.total,
+          balance: billBalance(b, s.payments),
+        };
+      });
     return { kind: "payment_status", paid, unpaid };
   }
 
   // 4) Revenue report
   if (has("تحصيل", "محصل", "ايراد", "إيراد", "دخل")) {
     const range = has("اليوم") ? todayRange() : has("أسبوع", "اسبوع") ? weekRange() : monthRange();
-    const payments = s.payments.filter((p) => p.status === "approved" && +new Date(p.date) >= range.start && +new Date(p.date) < range.end);
+    const payments = s.payments.filter(
+      (p) =>
+        p.status === "approved" &&
+        +new Date(p.date) >= range.start &&
+        +new Date(p.date) < range.end,
+    );
     const cash = payments.filter((p) => p.method === "نقدي").reduce((a, b) => a + b.amount, 0);
     const bank = payments.filter((p) => p.method === "الكريمي").reduce((a, b) => a + b.amount, 0);
     const total = cash + bank;
@@ -151,7 +199,8 @@ export function answerQuestion(q: string): AiResponse {
     payments.forEach((p) => {
       const d = iso(+new Date(p.date));
       const cur = days.get(d) ?? { cash: 0, bank: 0, total: 0 };
-      if (p.method === "نقدي") cur.cash += p.amount; else if (p.method === "الكريمي") cur.bank += p.amount;
+      if (p.method === "نقدي") cur.cash += p.amount;
+      else if (p.method === "الكريمي") cur.bank += p.amount;
       cur.total += p.amount;
       days.set(d, cur);
     });
@@ -161,7 +210,13 @@ export function answerQuestion(q: string): AiResponse {
     return {
       kind: "revenue_report",
       range: { from: iso(range.start), to: iso(range.end - 1), label: range.label },
-      totals: { cash, bank, total, count: payments.length, avg: payments.length ? total / payments.length : 0 },
+      totals: {
+        cash,
+        bank,
+        total,
+        count: payments.length,
+        avg: payments.length ? total / payments.length : 0,
+      },
       series,
     };
   }

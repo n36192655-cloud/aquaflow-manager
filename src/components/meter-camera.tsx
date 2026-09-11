@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Camera, Loader2, ScanLine, X, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,9 +47,13 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } }, audio: false,
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
         });
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -57,7 +67,9 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
     })();
     return () => {
       cancelled = true;
-      setReady(false); setBusy(false); setProgress(0);
+      setReady(false);
+      setBusy(false);
+      setProgress(0);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -67,13 +79,15 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
 
   async function capture() {
     if (!videoRef.current || !canvasRef.current) return;
-    setBusy(true); setProgress(0);
+    setBusy(true);
+    setProgress(0);
     try {
       const v = videoRef.current;
       const c = canvasRef.current;
       const w = v.videoWidth || 640;
       const h = v.videoHeight || 480;
-      c.width = w; c.height = h;
+      c.width = w;
+      c.height = h;
       const ctx = c.getContext("2d");
       if (!ctx) throw new Error("no ctx");
       ctx.drawImage(v, 0, 0, w, h);
@@ -122,7 +136,12 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
         {expectedSerial && (
           <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-primary" />
-            <span>الرقم المتوقع للعداد: <span className="font-mono font-semibold" dir="ltr">{expectedSerial}</span></span>
+            <span>
+              الرقم المتوقع للعداد:{" "}
+              <span className="font-mono font-semibold" dir="ltr">
+                {expectedSerial}
+              </span>
+            </span>
           </div>
         )}
         <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
@@ -136,9 +155,13 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
             </div>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">وجّه الكاميرا نحو شاشة العداد بحيث تكون الأرقام ورقم العداد داخل الإطار.</p>
+        <p className="text-xs text-muted-foreground">
+          وجّه الكاميرا نحو شاشة العداد بحيث تكون الأرقام ورقم العداد داخل الإطار.
+        </p>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}><X className="w-4 h-4 ms-1" /> إلغاء</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            <X className="w-4 h-4 ms-1" /> إلغاء
+          </Button>
           <Button onClick={capture} disabled={!ready || busy}>
             <ScanLine className="w-4 h-4 ms-1" /> التقاط وقراءة
           </Button>

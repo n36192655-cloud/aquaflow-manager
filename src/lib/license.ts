@@ -27,7 +27,10 @@ interface LicenseState {
   initIfNeeded: () => void;
   // Synchronous local checks (used by AppShell / login for UI gating)
   validate: () => LicenseStatus;
-  acquireSeat: (user: string, role: string) => { ok: boolean; seatId?: string; reason?: LicenseStatus };
+  acquireSeat: (
+    user: string,
+    role: string,
+  ) => { ok: boolean; seatId?: string; reason?: LicenseStatus };
   releaseSeat: (seatId: string) => void;
   touchSeat: (seatId: string) => void;
   // Cloud-backed helpers used by the subscription admin screen
@@ -151,7 +154,10 @@ export const useLicense = create<LicenseState>()(
             _days: 365,
           });
           if (error) throw error;
-          const row: any = Array.isArray(data) ? data[0] : data;
+          const row = (Array.isArray(data) ? data[0] : data) as
+            | { id?: string; subscription_expires_at?: string }
+            | null
+            | undefined;
           set({
             tenantId: row?.id ?? tenantId,
             licenseKey,

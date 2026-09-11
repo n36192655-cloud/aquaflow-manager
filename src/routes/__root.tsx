@@ -81,7 +81,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "منصة ميزان — إدارة عدادات المياه" },
-      { name: "description", content: "نظام سحابي متعدد المستأجرين لإدارة مشاريع مياه اليمن: المشتركون، القراءات، الفواتير، التحصيل، وتحليل الفاقد." },
+      {
+        name: "description",
+        content:
+          "نظام سحابي متعدد المستأجرين لإدارة مشاريع مياه اليمن: المشتركون، القراءات، الفواتير، التحصيل، وتحليل الفاقد.",
+      },
       { name: "author", content: "MIZAN" },
       { property: "og:title", content: "منصة ميزان — إدارة مشاريع المياه" },
       { property: "og:description", content: "إدارة كاملة لعدادات وفواتير المياه في اليمن." },
@@ -96,7 +100,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -218,10 +225,7 @@ function SubscriptionGuard({ children }: { children: ReactNode }) {
 
 function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | null }) {
   return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-background px-4"
-      dir="rtl"
-    >
+    <div className="min-h-screen flex items-center justify-center bg-background px-4" dir="rtl">
       <div className="max-w-md text-center space-y-4">
         <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 grid place-items-center">
           <span className="text-3xl">🔒</span>
@@ -230,8 +234,8 @@ function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | 
           {reason === "expired" ? "انتهى الاشتراك" : "الاشتراك موقوف"}
         </h1>
         <p className="text-sm text-muted-foreground">
-          مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي.
-          يرجى التواصل مع مالك المنصة لتفعيل الاشتراك مرة أخرى.
+          مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي. يرجى التواصل مع
+          مالك المنصة لتفعيل الاشتراك مرة أخرى.
         </p>
         <div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground">
           Subscription Expired — Contact Platform Owner

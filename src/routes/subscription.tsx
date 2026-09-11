@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLicense, statusLabel, VENDOR_NAME } from "@/lib/license";
+import { useLicense, statusLabel, VENDOR_NAME, type LicenseStatus } from "@/lib/license";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +17,10 @@ export const Route = createFileRoute("/subscription")({
 
 function SubscriptionPage() {
   const lic = useLicense();
-  const [currentStatus, setCurrentStatus] = useState<any>("active");
+  const [currentStatus, setCurrentStatus] = useState<LicenseStatus>("active");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showActivationForm, setShowActivationForm] = useState(false);
-  
+
   const [formTenantId, setFormTenantId] = useState("");
   const [formKey, setFormKey] = useState("");
   const [formSeats, setFormSeats] = useState(3); // 3 أجهزة افتراضياً للعميل الحالي
@@ -34,7 +34,9 @@ function SubscriptionPage() {
   }, []);
 
   function unlockAdminPanel() {
-    const password = prompt("🔒 يرجى إدخال رمز المطور (Indicatorz Master Key) لفتح لوحة الصيانة والتحكم عن بعد:");
+    const password = prompt(
+      "🔒 يرجى إدخال رمز المطور (Indicatorz Master Key) لفتح لوحة الصيانة والتحكم عن بعد:",
+    );
     if (password !== "indicatorz@2026") {
       toast.error("رمز المطور غير صحيح!");
       return;
@@ -72,11 +74,7 @@ function SubscriptionPage() {
       return;
     }
 
-    const success = await lic.activateRemote(
-      formTenantId.trim(),
-      formKey.trim(),
-      formSeats
-    );
+    const success = await lic.activateRemote(formTenantId.trim(), formKey.trim(), formSeats);
 
     if (success) {
       toast.success("🔥 تم تفعيل المستأجر بنظام السحابة الموحدة للأجهزة المتزامنة!");
@@ -90,12 +88,17 @@ function SubscriptionPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted text-right" dir="rtl">
+    <div
+      className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted text-right"
+      dir="rtl"
+    >
       <div className="flex-1 grid place-items-center px-4 py-10">
         <div className="w-full max-w-lg space-y-4">
           <Card className="border-border shadow-xl relative overflow-hidden">
-            
-            <button onClick={unlockAdminPanel} className="absolute top-4 left-4 text-muted-foreground/10 hover:text-primary/40 transition-colors">
+            <button
+              onClick={unlockAdminPanel}
+              className="absolute top-4 left-4 text-muted-foreground/10 hover:text-primary/40 transition-colors"
+            >
               <KeyRound className="w-4 h-4" />
             </button>
 
@@ -110,39 +113,72 @@ function SubscriptionPage() {
                   : `${statusLabel(currentStatus)}. يرجى مراجعة مركز الصيانة.`}
               </p>
             </CardHeader>
-            
+
             <CardContent className="space-y-5">
               <div className="grid gap-1 bg-muted/30 p-4 rounded-xl border text-sm">
                 <Row label="معرّف المستأجر الموحد" value={lic.tenantId || "غير مفعّل ⚠️"} />
-                <Row label="مفتاح الترخيص السحابي" value={lic.licenseKey ? `•••• •••• ${lic.licenseKey.slice(-4)}` : "—"} />
-                <Row label="حالة الدورة الحالية" value={<Badge variant={currentStatus === "active" ? "default" : "destructive"}>{statusLabel(currentStatus)}</Badge>} />
-                <Row label="تاريخ انتهاء الصلاحية" value={lic.expiresAt ? new Date(lic.expiresAt).toLocaleDateString("ar-YE") : "—"} />
-                <Row label="الأجهزة المصرح بها (المقاعد)" value={<span className="flex items-center gap-1 font-mono"><Users className="w-3.5 h-3.5 text-muted-foreground" /> {lic.maxSeats} أجهزة بالتزامن</span>} />
+                <Row
+                  label="مفتاح الترخيص السحابي"
+                  value={lic.licenseKey ? `•••• •••• ${lic.licenseKey.slice(-4)}` : "—"}
+                />
+                <Row
+                  label="حالة الدورة الحالية"
+                  value={
+                    <Badge variant={currentStatus === "active" ? "default" : "destructive"}>
+                      {statusLabel(currentStatus)}
+                    </Badge>
+                  }
+                />
+                <Row
+                  label="تاريخ انتهاء الصلاحية"
+                  value={lic.expiresAt ? new Date(lic.expiresAt).toLocaleDateString("ar-YE") : "—"}
+                />
+                <Row
+                  label="الأجهزة المصرح بها (المقاعد)"
+                  value={
+                    <span className="flex items-center gap-1 font-mono">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" /> {lic.maxSeats} أجهزة
+                      بالتزامن
+                    </span>
+                  }
+                />
                 <Row label="بصمة جهازك الحالي" value={lic.currentFingerprint()} mono />
               </div>
 
               <div className="rounded-xl bg-primary/5 p-4 text-xs border border-primary/10 space-y-2.5">
                 <div className="font-bold flex items-center gap-1.5 text-primary text-sm">
-                  <ShieldCheck className="w-4 h-4" /> خدمات عزل البيانات والتحكم السحابي الموحد — {VENDOR_NAME}
+                  <ShieldCheck className="w-4 h-4" /> خدمات عزل البيانات والتحكم السحابي الموحد —{" "}
+                  {VENDOR_NAME}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground pt-1">
-                  <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-primary" /> +967 777 543 819</div>
-                  <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> support@indicators-ye.com</div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-primary" /> +967 777 543 819
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-primary" /> support@indicators-ye.com
+                  </div>
                 </div>
               </div>
 
               {isAdminUnlocked && (
                 <div className="border-t pt-4 space-y-4 bg-amber-500/5 p-4 rounded-xl border-dashed border-amber-500/30">
                   <div className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
-                    <KeyRound className="w-4 h-4" /> لوحة التحكم الفوري بالأجهزة عن بُعد (Indicatorz Suite)
+                    <KeyRound className="w-4 h-4" /> لوحة التحكم الفوري بالأجهزة عن بُعد (Indicatorz
+                    Suite)
                   </div>
-                  
+
                   <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" variant={showActivationForm ? "default" : "outline"} onClick={() => setShowActivationForm(!showActivationForm)}>
+                    <Button
+                      size="sm"
+                      variant={showActivationForm ? "default" : "outline"}
+                      onClick={() => setShowActivationForm(!showActivationForm)}
+                    >
                       {showActivationForm ? "إغلاق نموذج التفعيل" : "🚀 إنشاء رخصة سحابية لعميل"}
                     </Button>
                     <Button size="sm" variant="destructive" onClick={toggleRemoteBilling}>
-                      {lic.billingPaid ? "🛑 إيقاف الـ 3 أجهزة فوراً عن بُعد" : "✅ إعادة تشغيل الأجهزة"}
+                      {lic.billingPaid
+                        ? "🛑 إيقاف الـ 3 أجهزة فوراً عن بُعد"
+                        : "✅ إعادة تشغيل الأجهزة"}
                     </Button>
                   </div>
 
@@ -152,23 +188,49 @@ function SubscriptionPage() {
                         <CheckCircle className="w-3.5 h-3.5" /> تهيئة العميل السحابي المتزامن
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-muted-foreground">معرّف المستأجر الموحد للثلاثة أجهزة</Label>
-                        <Input value={formTenantId} onChange={(e) => setFormTenantId(e.target.value)} placeholder="مثال: client-mohammad-2026" className="h-9 text-left font-mono" />
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          معرّف المستأجر الموحد للثلاثة أجهزة
+                        </Label>
+                        <Input
+                          value={formTenantId}
+                          onChange={(e) => setFormTenantId(e.target.value)}
+                          placeholder="مثال: client-mohammad-2026"
+                          className="h-9 text-left font-mono"
+                        />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-muted-foreground">مفتاح ترخيص النظام الموحد</Label>
-                        <Input value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="مثال: KEY-3DEVICES-VALID" className="h-9 text-left font-mono" />
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          مفتاح ترخيص النظام الموحد
+                        </Label>
+                        <Input
+                          value={formKey}
+                          onChange={(e) => setFormKey(e.target.value)}
+                          placeholder="مثال: KEY-3DEVICES-VALID"
+                          className="h-9 text-left font-mono"
+                        />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-muted-foreground">عدد الأجهزة المشتركة في المزامنة</Label>
-                        <Input type="number" value={formSeats} onChange={(e) => setFormSeats(Number(e.target.value))} className="h-9 text-left font-mono" />
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          عدد الأجهزة المشتركة في المزامنة
+                        </Label>
+                        <Input
+                          type="number"
+                          value={formSeats}
+                          onChange={(e) => setFormSeats(Number(e.target.value))}
+                          className="h-9 text-left font-mono"
+                        />
                       </div>
-                      <Button size="sm" className="w-full h-9 mt-2 font-medium" onClick={submitActivation}>ربط وتفعيل الأجهزة الثلاثة سحابياً</Button>
+                      <Button
+                        size="sm"
+                        className="w-full h-9 mt-2 font-medium"
+                        onClick={submitActivation}
+                      >
+                        ربط وتفعيل الأجهزة الثلاثة سحابياً
+                      </Button>
                     </div>
                   )}
                 </div>
               )}
-
             </CardContent>
           </Card>
         </div>
@@ -177,12 +239,24 @@ function SubscriptionPage() {
   );
 }
 
-interface RowProps { label: string; value: React.ReactNode; mono?: boolean; }
+interface RowProps {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}
 function Row({ label, value, mono }: RowProps) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/40 py-2 last:border-0 last:pb-0">
       <span className="text-muted-foreground font-medium">{label}</span>
-      <span className={mono ? "font-mono text-xs text-left text-foreground bg-muted px-1.5 py-0.5 rounded" : "font-semibold text-foreground"}>{value}</span>
+      <span
+        className={
+          mono
+            ? "font-mono text-xs text-left text-foreground bg-muted px-1.5 py-0.5 rounded"
+            : "font-semibold text-foreground"
+        }
+      >
+        {value}
+      </span>
     </div>
   );
 }
