@@ -17,7 +17,7 @@ export const Route = createFileRoute("/subscription")({
 
 function SubscriptionPage() {
   const lic = useLicense();
-  const [currentStatus, setCurrentStatus] = useState<any>("active");
+  const [currentStatus, setCurrentStatus] = useState<LicenseStatus>("active");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showActivationForm, setShowActivationForm] = useState(false);
 

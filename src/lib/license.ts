@@ -154,7 +154,10 @@ export const useLicense = create<LicenseState>()(
             _days: 365,
           });
           if (error) throw error;
-          const row: any = Array.isArray(data) ? data[0] : data;
+          const row = (Array.isArray(data) ? data[0] : data) as
+            | { id?: string; subscription_expires_at?: string }
+            | null
+            | undefined;
           set({
             tenantId: row?.id ?? tenantId,
             licenseKey,
