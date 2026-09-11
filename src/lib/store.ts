@@ -88,31 +88,38 @@ function nextSerial(prefix: string, id: number): string {
 }
 
 const DIRECTORATES = [
-  "المظفر", "القاهرة", "صالة", "المعافر", "الشمايتين", "المسراخ", "جبل حبشي", "أخرى",
+  "المظفر",
+  "القاهرة",
+  "صالة",
+  "المعافر",
+  "الشمايتين",
+  "المسراخ",
+  "جبل حبشي",
+  "أخرى",
 ];
 export const TAIZ_DIRECTORATES = DIRECTORATES;
 
 const CUSTOMERS_BASE: Omit<Customer, "pay_account">[] = [
-  { id: 1,  name: "أحمد علي عبدالله",     phone: "777000001", city: "تعز", directorate: "المظفر" },
-  { id: 2,  name: "محمد سالم أحمد",       phone: "777000002", city: "تعز", directorate: "القاهرة" },
-  { id: 3,  name: "خالد حسن صالح",        phone: "777000003", city: "تعز", directorate: "صالة" },
-  { id: 4,  name: "علي عبد الكريم",       phone: "777000004", city: "تعز", directorate: "المظفر" },
-  { id: 5,  name: "سعيد محمد عبدالله",    phone: "777000005", city: "تعز", directorate: "المعافر" },
-  { id: 6,  name: "حسن يحيى قاسم",        phone: "777000006", city: "تعز", directorate: "الشمايتين" },
-  { id: 7,  name: "فهد أحمد منصور",       phone: "777000007", city: "تعز", directorate: "القاهرة" },
-  { id: 8,  name: "ناصر علي سعيد",        phone: "777000008", city: "تعز", directorate: "المسراخ" },
-  { id: 9,  name: "ياسر سالم محمد",       phone: "777000009", city: "تعز", directorate: "صالة" },
-  { id: 10, name: "عبدالكريم حسن",        phone: "777000010", city: "تعز", directorate: "المظفر" },
-  { id: 11, name: "صالح قاسم علي",        phone: "777000011", city: "تعز", directorate: "جبل حبشي" },
-  { id: 12, name: "مروان جميل أحمد",      phone: "777000012", city: "تعز", directorate: "القاهرة" },
-  { id: 13, name: "إبراهيم سعيد محمد",    phone: "777000013", city: "تعز", directorate: "صالة" },
-  { id: 14, name: "أمين صالح عبدالله",    phone: "777000014", city: "تعز", directorate: "المعافر" },
-  { id: 15, name: "جمال حسن علي",         phone: "777000015", city: "تعز", directorate: "المظفر" },
-  { id: 16, name: "رائد محمد سالم",       phone: "777000016", city: "تعز", directorate: "الشمايتين" },
-  { id: 17, name: "بدر علي أحمد",         phone: "777000017", city: "تعز", directorate: "القاهرة" },
-  { id: 18, name: "أنور سالم قاسم",       phone: "777000018", city: "تعز", directorate: "المسراخ" },
-  { id: 19, name: "وليد أحمد حسن",        phone: "777000019", city: "تعز", directorate: "صالة" },
-  { id: 20, name: "ماجد قاسم عبدالله",    phone: "777000020", city: "تعز", directorate: "المظفر" },
+  { id: 1, name: "أحمد علي عبدالله", phone: "777000001", city: "تعز", directorate: "المظفر" },
+  { id: 2, name: "محمد سالم أحمد", phone: "777000002", city: "تعز", directorate: "القاهرة" },
+  { id: 3, name: "خالد حسن صالح", phone: "777000003", city: "تعز", directorate: "صالة" },
+  { id: 4, name: "علي عبد الكريم", phone: "777000004", city: "تعز", directorate: "المظفر" },
+  { id: 5, name: "سعيد محمد عبدالله", phone: "777000005", city: "تعز", directorate: "المعافر" },
+  { id: 6, name: "حسن يحيى قاسم", phone: "777000006", city: "تعز", directorate: "الشمايتين" },
+  { id: 7, name: "فهد أحمد منصور", phone: "777000007", city: "تعز", directorate: "القاهرة" },
+  { id: 8, name: "ناصر علي سعيد", phone: "777000008", city: "تعز", directorate: "المسراخ" },
+  { id: 9, name: "ياسر سالم محمد", phone: "777000009", city: "تعز", directorate: "صالة" },
+  { id: 10, name: "عبدالكريم حسن", phone: "777000010", city: "تعز", directorate: "المظفر" },
+  { id: 11, name: "صالح قاسم علي", phone: "777000011", city: "تعز", directorate: "جبل حبشي" },
+  { id: 12, name: "مروان جميل أحمد", phone: "777000012", city: "تعز", directorate: "القاهرة" },
+  { id: 13, name: "إبراهيم سعيد محمد", phone: "777000013", city: "تعز", directorate: "صالة" },
+  { id: 14, name: "أمين صالح عبدالله", phone: "777000014", city: "تعز", directorate: "المعافر" },
+  { id: 15, name: "جمال حسن علي", phone: "777000015", city: "تعز", directorate: "المظفر" },
+  { id: 16, name: "رائد محمد سالم", phone: "777000016", city: "تعز", directorate: "الشمايتين" },
+  { id: 17, name: "بدر علي أحمد", phone: "777000017", city: "تعز", directorate: "القاهرة" },
+  { id: 18, name: "أنور سالم قاسم", phone: "777000018", city: "تعز", directorate: "المسراخ" },
+  { id: 19, name: "وليد أحمد حسن", phone: "777000019", city: "تعز", directorate: "صالة" },
+  { id: 20, name: "ماجد قاسم عبدالله", phone: "777000020", city: "تعز", directorate: "المظفر" },
 ];
 const CUSTOMERS_SEED: Customer[] = CUSTOMERS_BASE.map((c) => ({
   ...c,
@@ -128,10 +135,26 @@ const METERS_SEED: Meter[] = Array.from({ length: 20 }, (_, i) => {
 });
 
 const READ_PAIRS: Array<[number, number]> = [
-  [100, 135], [200, 250], [150, 180], [300, 420], [80, 112],
-  [500, 640], [220, 265], [410, 560], [90, 130], [350, 470],
-  [175, 210], [280, 395], [60, 92], [430, 590], [140, 185],
-  [320, 445], [110, 150], [260, 380], [95, 128], [370, 510],
+  [100, 135],
+  [200, 250],
+  [150, 180],
+  [300, 420],
+  [80, 112],
+  [500, 640],
+  [220, 265],
+  [410, 560],
+  [90, 130],
+  [350, 470],
+  [175, 210],
+  [280, 395],
+  [60, 92],
+  [430, 590],
+  [140, 185],
+  [320, 445],
+  [110, 150],
+  [260, 380],
+  [95, 128],
+  [370, 510],
 ];
 
 function seedReadings(): Reading[] {
@@ -143,9 +166,29 @@ function seedReadings(): Reading[] {
   METERS_SEED.forEach((m, idx) => {
     const [prev, curr] = READ_PAIRS[idx];
     const id1 = id++;
-    arr.push({ id: id1, serial: nextSerial("RD", id1), meter_id: m.id, previous: 0, current: prev, consumption: prev, date: m1, flag: "ok", status: "approved" });
+    arr.push({
+      id: id1,
+      serial: nextSerial("RD", id1),
+      meter_id: m.id,
+      previous: 0,
+      current: prev,
+      consumption: prev,
+      date: m1,
+      flag: "ok",
+      status: "approved",
+    });
     const id2 = id++;
-    arr.push({ id: id2, serial: nextSerial("RD", id2), meter_id: m.id, previous: prev, current: curr, consumption: curr - prev, date: m2, flag: "ok", status: "approved" });
+    arr.push({
+      id: id2,
+      serial: nextSerial("RD", id2),
+      meter_id: m.id,
+      previous: prev,
+      current: curr,
+      consumption: curr - prev,
+      date: m2,
+      flag: "ok",
+      status: "approved",
+    });
   });
   return arr;
 }
@@ -163,10 +206,16 @@ function seedBills(readings: Reading[]): Bill[] {
     const subtotal = priceFor(meter.type, r.consumption);
     const bid = id++;
     bills.push({
-      id: bid, serial: nextSerial("INV", bid),
-      customer_id: meter.customer_id, meter_id: meterId, reading_id: r.id,
-      subtotal, arrears: 0, total: subtotal,
-      status: bid % 3 === 0 ? "paid" : "unpaid", date: r.date,
+      id: bid,
+      serial: nextSerial("INV", bid),
+      customer_id: meter.customer_id,
+      meter_id: meterId,
+      reading_id: r.id,
+      subtotal,
+      arrears: 0,
+      total: subtotal,
+      status: bid % 3 === 0 ? "paid" : "unpaid",
+      date: r.date,
     });
   }
   return bills;
@@ -181,18 +230,34 @@ interface State {
   productionLogs: ProductionLog[];
   seeded: boolean;
   adminCreateSubscriber: (data: {
-    name: string; phone: string; directorate: string; address: string;
-    meterType: MeterType; meterNumber: string; submittedBy?: string;
+    name: string;
+    phone: string;
+    directorate: string;
+    address: string;
+    meterType: MeterType;
+    meterNumber: string;
+    submittedBy?: string;
   }) => { customer: Customer; meter: Meter };
   updateCustomer: (id: number, c: Partial<Customer>) => void;
   deleteCustomer: (id: number) => void;
   addReadingWithBill: (input: {
-    meterId: number; current: number; photo?: string; ocrSerial?: string;
-    lat?: number; lng?: number; accuracy?: number; by?: string;
+    meterId: number;
+    current: number;
+    photo?: string;
+    ocrSerial?: string;
+    lat?: number;
+    lng?: number;
+    accuracy?: number;
+    by?: string;
   }) => { reading: Reading; bill: Bill | null };
   approveReading: (id: number) => void;
   rejectReading: (id: number) => void;
-  addPayment: (input: { billId: number; amount: number; method: PaymentMethod | string; by?: string }) => Payment;
+  addPayment: (input: {
+    billId: number;
+    amount: number;
+    method: PaymentMethod | string;
+    by?: string;
+  }) => Payment;
   approvePayment: (id: number) => void;
   rejectPayment: (id: number) => void;
   addProductionLog: (p: Omit<ProductionLog, "id">) => void;
@@ -244,25 +309,32 @@ export const useStore = create<State>()(
         };
         const mid = Math.max(0, ...s.meters.map((x) => x.id)) + 1;
         const meter: Meter = {
-          id: mid, customer_id: cid,
-          number: data.meterNumber, type: data.meterType, status: "active",
+          id: mid,
+          customer_id: cid,
+          number: data.meterNumber,
+          type: data.meterType,
+          status: "active",
         };
         set({ customers: [...s.customers, customer], meters: [...s.meters, meter] });
         return { customer, meter };
       },
 
-      updateCustomer: (id, c) => set((s) => ({
-        customers: s.customers.map((x) => (x.id === id ? { ...x, ...c } : x)),
-      })),
-      deleteCustomer: (id) => set((s) => ({
-        customers: s.customers.filter((x) => x.id !== id),
-        meters: s.meters.filter((m) => m.customer_id !== id),
-      })),
+      updateCustomer: (id, c) =>
+        set((s) => ({
+          customers: s.customers.map((x) => (x.id === id ? { ...x, ...c } : x)),
+        })),
+      deleteCustomer: (id) =>
+        set((s) => ({
+          customers: s.customers.filter((x) => x.id !== id),
+          meters: s.meters.filter((m) => m.customer_id !== id),
+        })),
 
       computeArrears: (customerId, excludeBillId) => {
         const s = get();
         return s.bills
-          .filter((b) => b.customer_id === customerId && b.id !== excludeBillId && b.status !== "paid")
+          .filter(
+            (b) => b.customer_id === customerId && b.id !== excludeBillId && b.status !== "paid",
+          )
           .reduce((a, b) => a + billBalance(b, s.payments), 0);
       },
 
@@ -284,10 +356,21 @@ export const useStore = create<State>()(
 
         const rid = Math.max(0, ...s.readings.map((r) => r.id)) + 1;
         const reading: Reading = {
-          id: rid, serial: nextSerial("RD", rid),
-          meter_id: meterId, previous: prev, current, consumption,
-          date: new Date().toISOString(), flag, status: "pending",
-          photo, ocr_serial: ocrSerial, lat, lng, accuracy, by,
+          id: rid,
+          serial: nextSerial("RD", rid),
+          meter_id: meterId,
+          previous: prev,
+          current,
+          consumption,
+          date: new Date().toISOString(),
+          flag,
+          status: "pending",
+          photo,
+          ocr_serial: ocrSerial,
+          lat,
+          lng,
+          accuracy,
+          by,
         };
 
         let bill: Bill | null = null;
@@ -298,10 +381,17 @@ export const useStore = create<State>()(
             .reduce((a, b) => a + billBalance(b, s.payments), 0);
           const bid = Math.max(0, ...s.bills.map((b) => b.id)) + 1;
           bill = {
-            id: bid, serial: nextSerial("INV", bid),
-            customer_id: meter.customer_id, meter_id: meter.id, reading_id: rid,
-            subtotal, arrears, total: subtotal + arrears,
-            status: "unpaid", date: reading.date, photo,
+            id: bid,
+            serial: nextSerial("INV", bid),
+            customer_id: meter.customer_id,
+            meter_id: meter.id,
+            reading_id: rid,
+            subtotal,
+            arrears,
+            total: subtotal + arrears,
+            status: "unpaid",
+            date: reading.date,
+            photo,
           };
         }
 
@@ -312,54 +402,70 @@ export const useStore = create<State>()(
         return { reading, bill };
       },
 
-      approveReading: (id) => set((s) => ({
-        readings: s.readings.map((r) => r.id === id ? { ...r, status: "approved" } : r),
-      })),
-      rejectReading: (id) => set((s) => {
-        // Also void the derived bill
-        const bill = s.bills.find((b) => b.reading_id === id);
-        return {
-          readings: s.readings.map((r) => r.id === id ? { ...r, status: "rejected" } : r),
-          bills: bill ? s.bills.filter((b) => b.id !== bill.id) : s.bills,
-        };
-      }),
+      approveReading: (id) =>
+        set((s) => ({
+          readings: s.readings.map((r) => (r.id === id ? { ...r, status: "approved" } : r)),
+        })),
+      rejectReading: (id) =>
+        set((s) => {
+          // Also void the derived bill
+          const bill = s.bills.find((b) => b.reading_id === id);
+          return {
+            readings: s.readings.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)),
+            bills: bill ? s.bills.filter((b) => b.id !== bill.id) : s.bills,
+          };
+        }),
 
       addPayment: ({ billId, amount, method, by }) => {
         const s = get();
         const p: Payment = {
           id: Math.max(0, ...s.payments.map((x) => x.id)) + 1,
-          bill_id: billId, amount, method, date: new Date().toISOString(),
-          status: "pending", by,
+          bill_id: billId,
+          amount,
+          method,
+          date: new Date().toISOString(),
+          status: "pending",
+          by,
         };
         set({ payments: [...s.payments, p] });
         return p;
       },
 
-      approvePayment: (id) => set((s) => {
-        const target = s.payments.find((p) => p.id === id);
-        if (!target) return {};
-        const payments = s.payments.map((p) => p.id === id ? { ...p, status: "approved" as ApprovalStatus } : p);
-        const bill = s.bills.find((b) => b.id === target.bill_id);
-        if (!bill) return { payments };
-        const paidTotal = payments
-          .filter((p) => p.bill_id === bill.id && p.status === "approved")
-          .reduce((a, b) => a + b.amount, 0);
-        const status: Bill["status"] = paidTotal >= bill.total ? "paid" : paidTotal > 0 ? "partial" : "unpaid";
-        return {
-          payments,
-          bills: s.bills.map((b) => b.id === bill.id ? { ...b, status } : b),
-        };
-      }),
-      rejectPayment: (id) => set((s) => ({
-        payments: s.payments.map((p) => p.id === id ? { ...p, status: "rejected" } : p),
-      })),
+      approvePayment: (id) =>
+        set((s) => {
+          const target = s.payments.find((p) => p.id === id);
+          if (!target) return {};
+          const payments = s.payments.map((p) =>
+            p.id === id ? { ...p, status: "approved" as ApprovalStatus } : p,
+          );
+          const bill = s.bills.find((b) => b.id === target.bill_id);
+          if (!bill) return { payments };
+          const paidTotal = payments
+            .filter((p) => p.bill_id === bill.id && p.status === "approved")
+            .reduce((a, b) => a + b.amount, 0);
+          const status: Bill["status"] =
+            paidTotal >= bill.total ? "paid" : paidTotal > 0 ? "partial" : "unpaid";
+          return {
+            payments,
+            bills: s.bills.map((b) => (b.id === bill.id ? { ...b, status } : b)),
+          };
+        }),
+      rejectPayment: (id) =>
+        set((s) => ({
+          payments: s.payments.map((p) => (p.id === id ? { ...p, status: "rejected" } : p)),
+        })),
 
-      addProductionLog: (p) => set((s) => ({
-        productionLogs: [...s.productionLogs, { ...p, id: Math.max(0, ...s.productionLogs.map((x) => x.id)) + 1 }],
-      })),
-      deleteProductionLog: (id) => set((s) => ({
-        productionLogs: s.productionLogs.filter((p) => p.id !== id),
-      })),
+      addProductionLog: (p) =>
+        set((s) => ({
+          productionLogs: [
+            ...s.productionLogs,
+            { ...p, id: Math.max(0, ...s.productionLogs.map((x) => x.id)) + 1 },
+          ],
+        })),
+      deleteProductionLog: (id) =>
+        set((s) => ({
+          productionLogs: s.productionLogs.filter((p) => p.id !== id),
+        })),
       reset: () => set(initial()),
     }),
     {
@@ -401,7 +507,10 @@ export const useStore = create<State>()(
             });
           }
           if (Array.isArray(s.payments)) {
-            s.payments = s.payments.map((p) => ({ ...p, status: (p as Payment).status ?? ("approved" as ApprovalStatus) })) as Payment[];
+            s.payments = s.payments.map((p) => ({
+              ...p,
+              status: (p as Payment).status ?? ("approved" as ApprovalStatus),
+            })) as Payment[];
           }
         }
         return s as State;
@@ -410,7 +519,11 @@ export const useStore = create<State>()(
   ),
 );
 
-export function useCustomer(id: number) { return useStore((s) => s.customers.find((c) => c.id === id)); }
-export function useMeter(id: number) { return useStore((s) => s.meters.find((m) => m.id === id)); }
+export function useCustomer(id: number) {
+  return useStore((s) => s.customers.find((c) => c.id === id));
+}
+export function useMeter(id: number) {
+  return useStore((s) => s.meters.find((m) => m.id === id));
+}
 export { calcConsumption };
 export { billBalance };

@@ -16,9 +16,24 @@ export const Route = createFileRoute("/login")({
 });
 
 const ROLES: { value: Role; username: string; icon: typeof ShieldCheck; desc: string }[] = [
-  { value: "admin", username: "manager", icon: ShieldCheck, desc: "لوحة التحكم والإحصائيات والمساعد الذكي" },
-  { value: "cashier", username: "cashier", icon: Wallet, desc: "استلام الدفعات النقدية وإصدار السندات" },
-  { value: "reader", username: "reader", icon: Camera, desc: "تصوير العدادات وإدخال القراءات ميدانياً" },
+  {
+    value: "admin",
+    username: "manager",
+    icon: ShieldCheck,
+    desc: "لوحة التحكم والإحصائيات والمساعد الذكي",
+  },
+  {
+    value: "cashier",
+    username: "cashier",
+    icon: Wallet,
+    desc: "استلام الدفعات النقدية وإصدار السندات",
+  },
+  {
+    value: "reader",
+    username: "reader",
+    icon: Camera,
+    desc: "تصوير العدادات وإدخال القراءات ميدانياً",
+  },
 ];
 
 function LoginPage() {
@@ -26,7 +41,9 @@ function LoginPage() {
   const { user, login } = useAuth();
   const lic = useLicense();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const licStatus = mounted ? lic.validate() : "active";
   const [role, setRole] = useState<Role>("admin");
   const [name, setName] = useState("manager");
@@ -41,7 +58,10 @@ function LoginPage() {
       <div className="flex-1 grid place-items-center px-4 py-10">
         <Card className="w-full max-w-md shadow-xl">
           <CardHeader className="text-center">
-            <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2" style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}>
+            <div
+              className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2"
+              style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}
+            >
               <Droplets className="w-7 h-7 text-white" />
             </div>
             <CardTitle className="text-2xl">منصة ميزان</CardTitle>
@@ -66,11 +86,15 @@ function LoginPage() {
                         active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                       }`}
                     >
-                      <Icon className={`w-5 h-5 mt-0.5 ${active ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon
+                        className={`w-5 h-5 mt-0.5 ${active ? "text-primary" : "text-muted-foreground"}`}
+                      />
                       <div>
                         <div className="font-semibold text-sm">{ROLE_LABEL[r.value]}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{r.desc}</div>
-                        <div className="text-[10px] text-muted-foreground mt-1 font-mono" dir="ltr">{r.username}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1 font-mono" dir="ltr">
+                          {r.username}
+                        </div>
                       </div>
                     </button>
                   );
@@ -80,35 +104,57 @@ function LoginPage() {
 
             <div>
               <Label>اسم المستخدم</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="اسم المستخدم" dir="ltr" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="اسم المستخدم"
+                dir="ltr"
+              />
             </div>
             <div>
               <Label>كلمة المرور</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="1234 (تجريبية)" />
-              <p className="text-[10px] text-muted-foreground mt-1">النظام يعمل بدون إنترنت — كلمة المرور التجريبية: 1234</p>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="1234 (تجريبية)"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                النظام يعمل بدون إنترنت — كلمة المرور التجريبية: 1234
+              </p>
             </div>
 
-            <Button className="w-full" size="lg" onClick={async () => {
-              const ok = await login(name, role, password);
-              if (!ok) {
-                const err = (useAuth.getState() as { loginError: string | null }).loginError;
-                if (err === "seat_limit") return toast.error("تم بلوغ الحد الأقصى للمستخدمين المتزامنين لهذه المؤسسة");
-                if (err === "expired") return toast.error("الاشتراك منتهي — يرجى تجديد الترخيص");
-                if (err === "invalid") return toast.error("الترخيص غير صالح على هذا الجهاز/النطاق");
-                return toast.error("بيانات غير صحيحة");
-              }
-              toast.success(`مرحباً ${name} — ${ROLE_LABEL[role]}`);
-              const isSuper = (useAuth.getState() as { user: { isSuperAdmin?: boolean } | null }).user?.isSuperAdmin;
-              navigate({ to: isSuper ? "/super-admin" : defaultRouteFor(role), replace: true });
-            }}>
-
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={async () => {
+                const ok = await login(name, role, password);
+                if (!ok) {
+                  const err = (useAuth.getState() as { loginError: string | null }).loginError;
+                  if (err === "seat_limit")
+                    return toast.error("تم بلوغ الحد الأقصى للمستخدمين المتزامنين لهذه المؤسسة");
+                  if (err === "expired") return toast.error("الاشتراك منتهي — يرجى تجديد الترخيص");
+                  if (err === "invalid")
+                    return toast.error("الترخيص غير صالح على هذا الجهاز/النطاق");
+                  return toast.error("بيانات غير صحيحة");
+                }
+                toast.success(`مرحباً ${name} — ${ROLE_LABEL[role]}`);
+                const isSuper = (useAuth.getState() as { user: { isSuperAdmin?: boolean } | null })
+                  .user?.isSuperAdmin;
+                navigate({ to: isSuper ? "/super-admin" : defaultRouteFor(role), replace: true });
+              }}
+            >
               دخول
             </Button>
             {mounted && licStatus !== "active" && (
-              <p className="text-xs text-destructive text-center">{statusLabel(licStatus)} — تواصل مع مزوّد الخدمة</p>
+              <p className="text-xs text-destructive text-center">
+                {statusLabel(licStatus)} — تواصل مع مزوّد الخدمة
+              </p>
             )}
             {mounted && lic.tenantId && (
-              <p className="text-[10px] text-muted-foreground text-center">مؤسسة #{lic.tenantId} · مقاعد {lic.seats.length}/{lic.maxSeats}</p>
+              <p className="text-[10px] text-muted-foreground text-center">
+                مؤسسة #{lic.tenantId} · مقاعد {lic.seats.length}/{lic.maxSeats}
+              </p>
             )}
           </CardContent>
         </Card>

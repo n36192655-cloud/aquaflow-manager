@@ -27,7 +27,10 @@ interface LicenseState {
   initIfNeeded: () => void;
   // Synchronous local checks (used by AppShell / login for UI gating)
   validate: () => LicenseStatus;
-  acquireSeat: (user: string, role: string) => { ok: boolean; seatId?: string; reason?: LicenseStatus };
+  acquireSeat: (
+    user: string,
+    role: string,
+  ) => { ok: boolean; seatId?: string; reason?: LicenseStatus };
   releaseSeat: (seatId: string) => void;
   touchSeat: (seatId: string) => void;
   // Cloud-backed helpers used by the subscription admin screen

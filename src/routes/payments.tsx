@@ -2,7 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { fmtYER } from "@/lib/pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +29,10 @@ function PaymentsPage() {
   const [tab, setTab] = useState<"pending" | "approved" | "rejected">("pending");
 
   const list = useMemo(
-    () => [...payments].filter((p) => p.status === tab).sort((a, b) => +new Date(b.date) - +new Date(a.date)),
+    () =>
+      [...payments]
+        .filter((p) => p.status === tab)
+        .sort((a, b) => +new Date(b.date) - +new Date(a.date)),
     [payments, tab],
   );
 
@@ -30,7 +40,9 @@ function PaymentsPage() {
   const totals = useMemo(() => {
     const cash = approved.filter((p) => p.method === "نقدي").reduce((a, b) => a + b.amount, 0);
     const bank = approved.filter((p) => p.method === "الكريمي").reduce((a, b) => a + b.amount, 0);
-    const pending = payments.filter((p) => p.status === "pending").reduce((a, b) => a + b.amount, 0);
+    const pending = payments
+      .filter((p) => p.status === "pending")
+      .reduce((a, b) => a + b.amount, 0);
     return { cash, bank, total: cash + bank, pending };
   }, [payments, approved]);
 
@@ -38,26 +50,59 @@ function PaymentsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">التحصيل</h1>
-        <p className="text-sm text-muted-foreground mt-1">اعتماد الدفعات (نقدي / الكريمي) وخصمها آنياً من رصيد المشترك</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          اعتماد الدفعات (نقدي / الكريمي) وخصمها آنياً من رصيد المشترك
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="نقدي معتمد" value={fmtYER(totals.cash)} icon={<Wallet className="w-5 h-5 text-water" />} />
-        <Stat label="تحويلات معتمدة" value={fmtYER(totals.bank)} icon={<Smartphone className="w-5 h-5 text-primary" />} />
-        <Stat label="الإجمالي" value={fmtYER(totals.total)} icon={<CircleDollarSign className="w-5 h-5 text-emerald-600" />} highlight />
-        <Stat label="بانتظار الاعتماد" value={fmtYER(totals.pending)} icon={<Wallet className="w-5 h-5 text-amber-600" />} />
+        <Stat
+          label="نقدي معتمد"
+          value={fmtYER(totals.cash)}
+          icon={<Wallet className="w-5 h-5 text-water" />}
+        />
+        <Stat
+          label="تحويلات معتمدة"
+          value={fmtYER(totals.bank)}
+          icon={<Smartphone className="w-5 h-5 text-primary" />}
+        />
+        <Stat
+          label="الإجمالي"
+          value={fmtYER(totals.total)}
+          icon={<CircleDollarSign className="w-5 h-5 text-emerald-600" />}
+          highlight
+        />
+        <Stat
+          label="بانتظار الاعتماد"
+          value={fmtYER(totals.pending)}
+          icon={<Wallet className="w-5 h-5 text-amber-600" />}
+        />
       </div>
 
       <div className="flex gap-2 flex-wrap">
         {(["pending", "approved", "rejected"] as const).map((t) => (
-          <Button key={t} size="sm" variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)}>
+          <Button
+            key={t}
+            size="sm"
+            variant={tab === t ? "default" : "outline"}
+            onClick={() => setTab(t)}
+          >
             {t === "pending" ? "بانتظار الاعتماد" : t === "approved" ? "معتمَدة" : "مرفوضة"}
           </Button>
         ))}
       </div>
 
       <Card>
-        <CardHeader><CardTitle>{tab === "pending" ? "طلبات اعتماد الدفعات" : tab === "approved" ? "الدفعات المعتمدة" : "الدفعات المرفوضة"} ({list.length})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>
+            {tab === "pending"
+              ? "طلبات اعتماد الدفعات"
+              : tab === "approved"
+                ? "الدفعات المعتمدة"
+                : "الدفعات المرفوضة"}{" "}
+            ({list.length})
+          </CardTitle>
+        </CardHeader>
         <CardContent className="p-4 overflow-auto">
           {list.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">لا يوجد.</p>
@@ -82,22 +127,41 @@ function PaymentsPage() {
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="text-muted-foreground">#{p.id}</TableCell>
-                      <TableCell className="text-xs">{new Date(p.date).toLocaleString("ar-EG")}</TableCell>
-                      <TableCell className="font-mono text-[11px]">{b?.serial ?? `#${p.bill_id}`}</TableCell>
+                      <TableCell className="text-xs">
+                        {new Date(p.date).toLocaleString("ar-EG")}
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px]">
+                        {b?.serial ?? `#${p.bill_id}`}
+                      </TableCell>
                       <TableCell>{c?.name ?? "—"}</TableCell>
                       <TableCell className="font-semibold">{fmtYER(p.amount)}</TableCell>
                       <TableCell>
-                        <Badge variant={p.method === "نقدي" ? "outline" : "secondary"}>{p.method}</Badge>
+                        <Badge variant={p.method === "نقدي" ? "outline" : "secondary"}>
+                          {p.method}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.by ?? "—"}</TableCell>
                       {tab === "pending" && (
                         <TableCell>
                           {isAdmin ? (
                             <div className="flex gap-1">
-                              <Button size="sm" onClick={() => { approvePayment(p.id); toast.success("تم الاعتماد وخصم المبلغ"); }}>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  approvePayment(p.id);
+                                  toast.success("تم الاعتماد وخصم المبلغ");
+                                }}
+                              >
                                 <Check className="w-3 h-3 ms-1" /> اعتماد
                               </Button>
-                              <Button size="sm" variant="destructive" onClick={() => { rejectPayment(p.id); toast.info("تم الرفض"); }}>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  rejectPayment(p.id);
+                                  toast.info("تم الرفض");
+                                }}
+                              >
                                 <X className="w-3 h-3 ms-1" /> رفض
                               </Button>
                             </div>
@@ -118,7 +182,17 @@ function PaymentsPage() {
   );
 }
 
-function Stat({ label, value, icon, highlight }: { label: string; value: string; icon: React.ReactNode; highlight?: boolean }) {
+function Stat({
+  label,
+  value,
+  icon,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  highlight?: boolean;
+}) {
   return (
     <Card className={highlight ? "border-primary/40 bg-primary/5" : ""}>
       <CardContent className="p-4 flex items-center justify-between">

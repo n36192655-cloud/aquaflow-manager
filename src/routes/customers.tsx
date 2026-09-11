@@ -6,15 +6,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2, Droplets, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/customers")({
-  head: () => ({ meta: [{ title: "المشتركون — ميزان" }, { name: "description", content: "الإدارة الموحّدة للمشتركين والعدادات." }] }),
+  head: () => ({
+    meta: [
+      { title: "المشتركون — ميزان" },
+      { name: "description", content: "الإدارة الموحّدة للمشتركين والعدادات." },
+    ],
+  }),
   component: CustomersPage,
 });
 
@@ -26,7 +51,14 @@ interface Form {
   meterType: MeterType;
   meterNumber: string;
 }
-const EMPTY: Form = { name: "", phone: "", directorate: TAIZ_DIRECTORATES[0], address: "", meterType: "water", meterNumber: "" };
+const EMPTY: Form = {
+  name: "",
+  phone: "",
+  directorate: TAIZ_DIRECTORATES[0],
+  address: "",
+  meterType: "water",
+  meterNumber: "",
+};
 
 function CustomersPage() {
   const { customers, meters, adminCreateSubscriber, deleteCustomer } = useStore();
@@ -35,7 +67,9 @@ function CustomersPage() {
   const [form, setForm] = useState<Form>(EMPTY);
 
   const filtered = customers.filter((c) =>
-    `${c.name} ${c.phone} ${c.directorate ?? ""} ${c.address ?? ""}`.toLowerCase().includes(q.toLowerCase()),
+    `${c.name} ${c.phone} ${c.directorate ?? ""} ${c.address ?? ""}`
+      .toLowerCase()
+      .includes(q.toLowerCase()),
   );
 
   function save() {
@@ -72,41 +106,72 @@ function CustomersPage() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 ms-1" /> إضافة مشترك جديد</Button>
+            <Button>
+              <Plus className="w-4 h-4 ms-1" /> إضافة مشترك جديد
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>مشترك جديد — نموذج موحّد</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>مشترك جديد — نموذج موحّد</DialogTitle>
+            </DialogHeader>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>الاسم الكامل *</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label>الهاتف *</Label>
-                  <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <Input
+                    dir="ltr"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
                 </div>
               </div>
               <div>
                 <Label>المديرية *</Label>
-                <Select value={form.directorate} onValueChange={(v) => setForm({ ...form, directorate: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.directorate}
+                  onValueChange={(v) => setForm({ ...form, directorate: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {TAIZ_DIRECTORATES.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    {TAIZ_DIRECTORATES.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>العنوان التفصيلي *</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="الحارة، الشارع، أقرب معلم…" />
+                <Input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  placeholder="الحارة، الشارع، أقرب معلم…"
+                />
               </div>
               <div>
                 <Label>رقم عداد المياه الجديد *</Label>
-                <Input dir="ltr" value={form.meterNumber} onChange={(e) => setForm({ ...form, meterNumber: e.target.value })} placeholder="مثال: W-1042" />
+                <Input
+                  dir="ltr"
+                  value={form.meterNumber}
+                  onChange={(e) => setForm({ ...form, meterNumber: e.target.value })}
+                  placeholder="مثال: W-1042"
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                إلغاء
+              </Button>
               <Button onClick={save}>حفظ وتفعيل</Button>
             </DialogFooter>
           </DialogContent>
@@ -117,7 +182,12 @@ function CustomersPage() {
         <CardContent className="p-4">
           <div className="relative mb-4">
             <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground" />
-            <Input className="ps-9" placeholder="بحث بالاسم، الهاتف، المديرية…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input
+              className="ps-9"
+              placeholder="بحث بالاسم، الهاتف، المديرية…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
           <div className="overflow-auto">
             <Table>
@@ -140,9 +210,13 @@ function CustomersPage() {
                     <TableRow key={c.id}>
                       <TableCell className="text-muted-foreground">{c.id}</TableCell>
                       <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell dir="ltr" className="text-right">{c.phone}</TableCell>
+                      <TableCell dir="ltr" className="text-right">
+                        {c.phone}
+                      </TableCell>
                       <TableCell>{c.directorate ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">{c.address ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">
+                        {c.address ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {cMeters.map((m) => (
@@ -151,12 +225,25 @@ function CustomersPage() {
                               {m.number}
                             </Badge>
                           ))}
-                          {cMeters.length === 0 && <span className="text-xs text-muted-foreground">لا يوجد</span>}
+                          {cMeters.length === 0 && (
+                            <span className="text-xs text-muted-foreground">لا يوجد</span>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-[11px] text-right">{c.pay_account}</TableCell>
+                      <TableCell dir="ltr" className="font-mono text-[11px] text-right">
+                        {c.pay_account}
+                      </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => { if (confirm("حذف المشترك وكل عداداته؟")) { deleteCustomer(c.id); toast.success("تم الحذف"); } }}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm("حذف المشترك وكل عداداته؟")) {
+                              deleteCustomer(c.id);
+                              toast.success("تم الحذف");
+                            }
+                          }}
+                        >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                       </TableCell>

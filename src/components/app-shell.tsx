@@ -1,5 +1,16 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Users, ClipboardList, Receipt, Wallet, Droplets, LogOut, TrendingDown, ShieldCheck, Scale } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  Receipt,
+  Wallet,
+  Droplets,
+  LogOut,
+  TrendingDown,
+  ShieldCheck,
+  Scale,
+} from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth, ROLE_LABEL, canAccess, defaultRouteFor, type Role } from "@/lib/auth";
@@ -29,7 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const license = useLicense();
 
   // Init license on first mount
-  useEffect(() => { license.initIfNeeded(); }, [license]);
+  useEffect(() => {
+    license.initIfNeeded();
+  }, [license]);
 
   // License validation gate — locks the app when subscription expires / invalid
   useEffect(() => {
@@ -42,7 +55,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Route protection
   useEffect(() => {
     if (pathname === "/login") return;
-    if (!user) { navigate({ to: "/login", replace: true }); return; }
+    if (!user) {
+      navigate({ to: "/login", replace: true });
+      return;
+    }
     if (pathname === "/subscription") return; // always accessible when signed in
     if (!canAccess(user.role, pathname)) {
       navigate({ to: defaultRouteFor(user.role), replace: true });
@@ -78,7 +94,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-l border-sidebar-border">
         <div className="px-5 py-6 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="relative w-9 h-9 rounded-xl grid place-items-center" style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}>
+            <div
+              className="relative w-9 h-9 rounded-xl grid place-items-center"
+              style={{ background: "linear-gradient(135deg, var(--water) 0%, #0ea5e9 100%)" }}
+            >
               <Droplets className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -89,7 +108,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {nav.map((item) => {
-            const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
+            const active =
+              pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
             const Icon = item.icon;
             return (
               <Link
@@ -114,35 +134,59 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div>
           </div>
           <button
-            onClick={() => { logout(); navigate({ to: "/login", replace: true }); }}
+            onClick={() => {
+              logout();
+              navigate({ to: "/login", replace: true });
+            }}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
           >
             <LogOut className="w-3 h-3" /> تسجيل الخروج
           </button>
-          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">تعز — اليمن · إصدار 2.0</div>
+          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">
+            تعز — اليمن · إصدار 2.0
+          </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2">
           <div className="md:hidden font-bold">ميزان</div>
-          <div className="hidden md:block text-xs text-muted-foreground">{ROLE_LABEL[user.role]} — {user.name}</div>
+          <div className="hidden md:block text-xs text-muted-foreground">
+            {ROLE_LABEL[user.role]} — {user.name}
+          </div>
           <NetworkStatus />
         </header>
         <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
         <CopyrightFooter className="border-t" />
-        <nav className="md:hidden sticky bottom-0 grid bg-sidebar text-sidebar-foreground border-t border-sidebar-border" style={{ gridTemplateColumns: `repeat(${nav.length + 1}, minmax(0,1fr))` }}>
+        <nav
+          className="md:hidden sticky bottom-0 grid bg-sidebar text-sidebar-foreground border-t border-sidebar-border"
+          style={{ gridTemplateColumns: `repeat(${nav.length + 1}, minmax(0,1fr))` }}
+        >
           {nav.map((item) => {
-            const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
+            const active =
+              pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
             const Icon = item.icon;
             return (
-              <Link key={item.to} to={item.to} className={cn("flex flex-col items-center gap-1 py-2 text-[10px]", active ? "text-sidebar-primary" : "text-sidebar-foreground/70")}>
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-2 text-[10px]",
+                  active ? "text-sidebar-primary" : "text-sidebar-foreground/70",
+                )}
+              >
                 <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
               </Link>
             );
           })}
-          <button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70">
+          <button
+            onClick={() => {
+              logout();
+              navigate({ to: "/login", replace: true });
+            }}
+            className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70"
+          >
             <LogOut className="w-4 h-4" />
             <span>خروج</span>
           </button>

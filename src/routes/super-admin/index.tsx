@@ -10,10 +10,7 @@ import { ShieldCheck, RefreshCw, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/")({
   head: () => ({
-    meta: [
-      { title: "لوحة مالك المنصة — ميزان" },
-      { name: "robots", content: "noindex,nofollow" },
-    ],
+    meta: [{ title: "لوحة مالك المنصة — ميزان" }, { name: "robots", content: "noindex,nofollow" }],
   }),
   component: SuperAdminDashboard,
 });
@@ -43,10 +40,7 @@ function SuperAdminDashboard() {
         navigate({ to: "/login" });
         return;
       }
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", uid);
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", uid);
       const ok = (roles ?? []).some((r) => r.role === "super_admin");
       setAllowed(ok);
       setChecking(false);
@@ -59,7 +53,6 @@ function SuperAdminDashboard() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
 
   async function refresh() {
     setLoading(true);
@@ -129,9 +122,7 @@ function SuperAdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              هذه اللوحة مخصصة لمالكي منصة ميزان فقط.
-            </p>
+            <p className="text-sm text-muted-foreground">هذه اللوحة مخصصة لمالكي منصة ميزان فقط.</p>
             <Button
               variant="outline"
               onClick={async () => {
@@ -155,9 +146,7 @@ function SuperAdminDashboard() {
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" /> لوحة مالك المنصة
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              إدارة مشاريع المياه والاشتراكات
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">إدارة مشاريع المياه والاشتراكات</p>
           </div>
           <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ml-2 ${loading ? "animate-spin" : ""}`} /> تحديث
@@ -172,9 +161,7 @@ function SuperAdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {tenants.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                لا توجد مشاريع بعد.
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-6">لا توجد مشاريع بعد.</p>
             )}
             {tenants.map((t) => (
               <div
@@ -183,9 +170,7 @@ function SuperAdminDashboard() {
               >
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{t.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono truncate">
-                    {t.id}
-                  </div>
+                  <div className="text-xs text-muted-foreground font-mono truncate">{t.id}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     ينتهي:{" "}
                     {t.subscription_expires_at
@@ -194,9 +179,7 @@ function SuperAdminDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge
-                    variant={t.subscription_status === "active" ? "default" : "destructive"}
-                  >
+                  <Badge variant={t.subscription_status === "active" ? "default" : "destructive"}>
                     {t.subscription_status === "active"
                       ? "نشط"
                       : t.subscription_status === "suspended"
