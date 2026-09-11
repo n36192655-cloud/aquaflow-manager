@@ -248,34 +248,46 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           bill_id: string
           client_id: string | null
           collector_id: string | null
           created_at: string
           id: string
           method: string
+          rejected_at: string | null
+          review_reason: string | null
           status: string
           tenant_id: string
         }
         Insert: {
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_id: string
           client_id?: string | null
           collector_id?: string | null
           created_at?: string
           id?: string
           method?: string
+          rejected_at?: string | null
+          review_reason?: string | null
           status?: string
           tenant_id: string
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           bill_id?: string
           client_id?: string | null
           collector_id?: string | null
           created_at?: string
           id?: string
           method?: string
+          rejected_at?: string | null
+          review_reason?: string | null
           status?: string
           tenant_id?: string
         }
@@ -470,6 +482,56 @@ export type Database = {
           },
         ]
       }
+      water_production_logs: {
+        Row: {
+          capture_source: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          production_m3: number
+          recorded_at: string
+          source_name: string
+          tenant_id: string
+          updated_at: string
+          verification_status: string
+        }
+        Insert: {
+          capture_source?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          production_m3: number
+          recorded_at?: string
+          source_name: string
+          tenant_id: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Update: {
+          capture_source?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          production_m3?: number
+          recorded_at?: string
+          source_name?: string
+          tenant_id?: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "water_production_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       water_readings: {
         Row: {
           capture_source: string
@@ -495,6 +557,7 @@ export type Database = {
           source_device: string | null
           status: string
           tenant_id: string
+          verification_status: string
         }
         Insert: {
           capture_source?: string
@@ -520,6 +583,7 @@ export type Database = {
           source_device?: string | null
           status?: string
           tenant_id: string
+          verification_status?: string
         }
         Update: {
           capture_source?: string
@@ -545,6 +609,7 @@ export type Database = {
           source_device?: string | null
           status?: string
           tenant_id?: string
+          verification_status?: string
         }
         Relationships: [
           {
@@ -598,6 +663,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_water_payment: {
+        Args: { p_payment_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          bill_id: string
+          client_id: string | null
+          collector_id: string | null
+          created_at: string
+          id: string
+          method: string
+          rejected_at: string | null
+          review_reason: string | null
+          status: string
+          tenant_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_water_reading: {
+        Args: { p_reading_id: string }
+        Returns: {
+          bill_id: string
+          reading_id: string
+          status: string
+        }[]
+      }
       current_billing_cycle: {
         Args: { p_at?: string; p_tenant: string }
         Returns: string
@@ -618,6 +715,44 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      recompute_water_bill_status: {
+        Args: { p_bill_id: string; p_tenant_id: string }
+        Returns: {
+          arrears: number
+          client_id: string | null
+          created_at: string
+          customer_id: string
+          cycle_id: string | null
+          id: string
+          issued_at: string
+          project_name: string | null
+          reading_id: string | null
+          status: string
+          subtotal: number
+          tenant_id: string
+          total: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "water_bills"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      record_water_payment: {
+        Args: {
+          p_amount: number
+          p_bill_id: string
+          p_client_id?: string
+          p_method?: string
+        }
+        Returns: {
+          amount: number
+          bill_id: string
+          payment_id: string
+          status: string
+        }[]
+      }
       record_water_reading: {
         Args: {
           p_accuracy?: number
@@ -641,6 +776,38 @@ export type Database = {
           previous: number
           project_name: string
           reading_id: string
+        }[]
+      }
+      reject_water_payment: {
+        Args: { p_payment_id: string; p_reason: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          bill_id: string
+          client_id: string | null
+          collector_id: string | null
+          created_at: string
+          id: string
+          method: string
+          rejected_at: string | null
+          review_reason: string | null
+          status: string
+          tenant_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reject_water_reading: {
+        Args: { p_reading_id: string; p_reason: string }
+        Returns: {
+          bill_id: string
+          reading_id: string
+          status: string
         }[]
       }
       water_charge: { Args: { p_units: number }; Returns: number }
