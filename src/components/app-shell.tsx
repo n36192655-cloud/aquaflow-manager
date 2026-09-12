@@ -35,7 +35,7 @@ const NAV: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { user, logout, heartbeat } = useAuth();
+  const { user, logout, heartbeat, hydrateFromSupabase } = useAuth();
   const online = useOnlineStatus();
   const license = useLicense();
 
@@ -44,13 +44,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     license.initIfNeeded();
   }, [license]);
 
+  // Re-validate the persisted identity against Supabase Auth on mount, so a
+  // stale local snapshot can never grant access to operational tenant data.
+  useEffect(() => {
+    if (pathname === "/login") return;
+    void hydrateFromSupabase().then((u) => {
+      if (!u) navigate({ to: "/login", replace: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // License validation gate — locks the app when subscription expires / invalid
   useEffect(() => {
     const status = license.validate();
-    if (status !== "active" && pathname !== "/subscription" && pathname !== "/login") {
+    if (
+      status !== "active" &&
+      pathname !== "/subscription" &&
+      pathname !== "/login" &&
+      !user?.isSuperAdmin
+    ) {
       navigate({ to: "/subscription", replace: true });
     }
-  }, [pathname, license, navigate]);
+  }, [pathname, license, navigate, user?.isSuperAdmin]);
 
   // Route protection
   useEffect(() => {
@@ -60,6 +75,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
     if (pathname === "/subscription") return; // always accessible when signed in
+    if (pathname.startsWith("/super-admin")) {
+      if (!user.isSuperAdmin) navigate({ to: defaultRouteFor(user.role), replace: true });
+      return;
+    }
     if (!canAccess(user.role, pathname)) {
       navigate({ to: defaultRouteFor(user.role), replace: true });
     }
