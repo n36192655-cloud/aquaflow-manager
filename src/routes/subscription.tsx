@@ -11,10 +11,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
-export const Route = createFileRoute("/subscription")({
-  head: () => ({ meta: [{ title: "حالة الاشتراك السحابي — ميزان" }] }),
-  component: SubscriptionPage,
-});
+export const Route = createFileRoute("/subscription")({ head: () => ({ meta: [{ title: "حالة الاشتراك السحابي — ميزان" }] }), component: SubscriptionPage });
 
 function SubscriptionPage() {
   const lic = useLicense();
@@ -30,14 +27,9 @@ function SubscriptionPage() {
 
   useEffect(() => {
     initIfNeeded();
-    if (user?.tenantId) {
-      void validateRemote(user.tenantId).then(setCurrentStatus);
-    }
+    if (user?.tenantId) void validateRemote(user.tenantId).then(setCurrentStatus);
     let cancelled = false;
-    void supabase.rpc("is_super_admin").then(({ data, error }) => {
-      if (cancelled) return;
-      setIsAdminUnlocked(!error && data === true);
-    });
+    void supabase.rpc("is_super_admin").then(({ data, error }) => { if (!cancelled) setIsAdminUnlocked(!error && data === true); });
     return () => { cancelled = true; };
   }, [initIfNeeded, validateRemote, user?.tenantId]);
 
@@ -51,18 +43,14 @@ function SubscriptionPage() {
       await validateRemote(tenantId);
       toast.success(nextStatus === "active" ? "تم تنشيط اشتراك المشروع سحابياً" : "🛑 تم تعليق الاشتراك فوراً — سيتم قفل الأجهزة المتصلة");
       window.location.reload();
-    } catch {
-      toast.error("فشل تعديل الحالة السحابية — تحقق من صلاحيات المشرف واتصال الإنترنت.");
-    }
+    } catch { toast.error("فشل تعديل الحالة السحابية — تحقق من صلاحيات المشرف واتصال الإنترنت."); }
   }
 
   async function submitActivation() {
     if (!formTenantId.trim() || !formKey.trim()) { toast.error("خطأ: يرجى إدخال البيانات كاملة."); return; }
     const success = await lic.activateRemote(formTenantId.trim(), formKey.trim(), formSeats);
-    if (success) {
-      toast.success("🔥 تم تفعيل المستأجر بنظام السحابة الموحدة للأجهزة المتزامنة!");
-      setShowActivationForm(false); setFormTenantId(""); setFormKey(""); window.location.reload();
-    } else toast.error("حدث خطأ أثناء الاتصال بالخادم أو رفضت صلاحيات المشرف التفعيل.");
+    if (success) { toast.success("🔥 تم تفعيل المستأجر بنظام السحابة الموحدة للأجهزة المتزامنة!"); setShowActivationForm(false); setFormTenantId(""); setFormKey(""); window.location.reload(); }
+    else toast.error("حدث خطأ أثناء الاتصال بالخادم أو رفضت صلاحيات المشرف التفعيل.");
   }
 
   return (
@@ -72,7 +60,7 @@ function SubscriptionPage() {
         <CardHeader className="text-center"><div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2 bg-primary/10"><Lock className="w-6 h-6 text-primary" /></div><CardTitle className="text-2xl font-bold">تزامن تراخيص الأجهزة</CardTitle><p className="text-sm text-muted-foreground mt-2">{currentStatus === "active" ? "الترخيص السحابي متصل ونشط. الأجهزة تعمل الآن بالتزامن اللحظي على نفس قاعدة البيانات الموحدة." : `${statusLabel(currentStatus)}. يرجى مراجعة مركز الصيانة.`}</p></CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-1 bg-muted/30 p-4 rounded-xl border text-sm">
-            <Row label="معرّف المستأجر الموحد" value={user?.tenantId ?? lic.tenantId || "غير مفعّل ⚠️"} />
+            <Row label="معرّف المستأجر الموحد" value={(user?.tenantId ?? lic.tenantId) || "غير مفعّل ⚠️"} />
             <Row label="مفتاح الترخيص السحابي" value={lic.licenseKey ? `•••• •••• ${lic.licenseKey.slice(-4)}` : "—"} />
             <Row label="حالة الدورة الحالية" value={<Badge variant={currentStatus === "active" ? "default" : "destructive"}>{statusLabel(currentStatus)}</Badge>} />
             <Row label="تاريخ انتهاء الصلاحية" value={lic.expiresAt ? new Date(lic.expiresAt).toLocaleDateString("ar-YE") : "—"} />
