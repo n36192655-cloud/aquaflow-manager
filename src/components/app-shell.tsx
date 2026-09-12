@@ -34,20 +34,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => { license.initIfNeeded(); }, [license]);
   useEffect(() => { if (!user?.tenantId) { setTenant(null); return; } let alive = true; void getCurrentTenant(user.tenantId).then((t) => { if (alive) setTenant(t); }).catch(() => { if (alive) setTenant(null); }); return () => { alive = false; }; }, [user?.tenantId]);
   useEffect(() => {
+    if (user?.isSuperAdmin) return;
     const status = license.validate();
     if (status !== "active" && pathname !== "/subscription" && pathname !== "/login") navigate({ to: "/subscription", replace: true });
-  }, [pathname, license, navigate]);
+  }, [pathname, license, navigate, user?.isSuperAdmin]);
   useEffect(() => {
     if (pathname === "/login") return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
     if (pathname === "/subscription") return;
-    if (!canAccess(user.role, pathname)) navigate({ to: defaultRouteFor(user.role), replace: true });
+    if (!canAccess(user.role, pathname, user.isSuperAdmin)) navigate({ to: defaultRouteFor(user.role, user.isSuperAdmin), replace: true });
   }, [pathname, user, navigate]);
   useEffect(() => { if (online) void syncPending(); }, [online]);
   useEffect(() => { if (!user?.seatId) return; heartbeat(); const timer = setInterval(() => heartbeat(), 60_000); return () => clearInterval(timer); }, [user?.seatId, heartbeat]);
 
   if (pathname === "/login" || !user) return <>{children}</>;
-  if (license.validate() !== "active" || pathname === "/subscription") return <>{children}</>;
+  if ((!user.isSuperAdmin && license.validate() !== "active") || pathname === "/subscription") return <>{children}</>;
+  if (user.isSuperAdmin && pathname === "/super-admin") return <>{children}</>;
   const nav = NAV.filter((item) => item.roles.includes(user.role));
   const renderNav = (mobile = false) => nav.map((item) => { const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to)); const Icon = item.icon; return <Link key={item.to} to={item.to} className={cn(mobile ? "flex flex-col items-center gap-1 py-2 text-[10px]" : "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", active ? "bg-sidebar-accent text-sidebar-primary font-semibold" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}><Icon className="w-4 h-4" /><span>{item.label}</span></Link>; });
 
