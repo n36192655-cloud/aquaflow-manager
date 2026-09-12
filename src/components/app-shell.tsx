@@ -6,7 +6,7 @@ import { canAccess, defaultRouteFor, ROLE_LABEL, useAuth, type Role } from "@/li
 import { NetworkStatus } from "./network-status";
 import { CopyrightFooter } from "./footer";
 import { syncPending, useOnlineStatus } from "@/lib/sync";
-import { useLicense } from "@/lib/license";
+import { useLicense, type LicenseStatus } from "@/lib/license";
 import { getCurrentTenant, type Tenant } from "@/lib/tenant";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: Role[] };
@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnlineStatus();
   const license = useLicense();
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [remoteLicenseStatus, setRemoteLicenseStatus] = useState<ReturnType<typeof useLicense.getState> extends never ? never : string | null>(null);
+  const [remoteLicenseStatus, setRemoteLicenseStatus] = useState<LicenseStatus | null>(null);
 
   useEffect(() => { license.initIfNeeded(); }, [license]);
   useEffect(() => { if (!user?.tenantId) { setTenant(null); return; } let alive = true; void getCurrentTenant(user.tenantId).then((t) => { if (alive) setTenant(t); }).catch(() => { if (alive) setTenant(null); }); return () => { alive = false; }; }, [user?.tenantId]);
@@ -59,7 +59,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => { if (!user?.seatId) return; heartbeat(); const timer = setInterval(() => heartbeat(), 60_000); return () => clearInterval(timer); }, [user?.seatId, heartbeat]);
 
   if (pathname === "/login" || !user) return <>{children}</>;
-  if (!user.isSuperAdmin && remoteLicenseStatus !== "active") return <>{children}</>;
+  if (!user.isSuperAdmin && remoteLicenseStatus === null && pathname !== "/subscription") return <div className="min-h-screen grid place-items-center bg-background text-foreground"><div className="text-sm text-muted-foreground">جارٍ التحقق من اشتراك المشروع…</div></div>;
+  if (!user.isSuperAdmin && remoteLicenseStatus !== "active" && pathname !== "/subscription") return <>{children}</>;
   if (pathname === "/subscription") return <>{children}</>;
   if (user.isSuperAdmin && pathname === "/super-admin") return <>{children}</>;
   const nav = NAV.filter((item) => item.roles.includes(user.role));
