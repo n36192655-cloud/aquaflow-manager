@@ -30,14 +30,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnlineStatus();
   const license = useLicense();
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [remoteLicenseStatus, setRemoteLicenseStatus] = useState<ReturnType<typeof useLicense.getState> extends never ? never : string | null>(null);
 
   useEffect(() => { license.initIfNeeded(); }, [license]);
   useEffect(() => { if (!user?.tenantId) { setTenant(null); return; } let alive = true; void getCurrentTenant(user.tenantId).then((t) => { if (alive) setTenant(t); }).catch(() => { if (alive) setTenant(null); }); return () => { alive = false; }; }, [user?.tenantId]);
   useEffect(() => {
-    if (user?.isSuperAdmin) return;
-    const status = license.validate();
-    if (status !== "active" && pathname !== "/subscription" && pathname !== "/login") navigate({ to: "/subscription", replace: true });
-  }, [pathname, license, navigate, user?.isSuperAdmin]);
+    let alive = true;
+    if (!user) { setRemoteLicenseStatus(null); return () => { alive = false; }; }
+    if (user.isSuperAdmin) { setRemoteLicenseStatus("active"); return () => { alive = false; }; }
+    if (!user.tenantId) { setRemoteLicenseStatus("invalid"); return () => { alive = false; }; }
+    setRemoteLicenseStatus(null);
+    void license.validateRemote(user.tenantId).then((status) => {
+      if (alive) setRemoteLicenseStatus(status);
+    });
+    return () => { alive = false; };
+  }, [user?.tenantId, user?.isSuperAdmin]);
+  useEffect(() => {
+    if (user?.isSuperAdmin || remoteLicenseStatus === "active") return;
+    if (pathname !== "/subscription" && pathname !== "/login" && remoteLicenseStatus && remoteLicenseStatus !== "active") navigate({ to: "/subscription", replace: true });
+  }, [pathname, navigate, user?.isSuperAdmin, remoteLicenseStatus]);
   useEffect(() => {
     if (pathname === "/login") return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
@@ -48,7 +59,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => { if (!user?.seatId) return; heartbeat(); const timer = setInterval(() => heartbeat(), 60_000); return () => clearInterval(timer); }, [user?.seatId, heartbeat]);
 
   if (pathname === "/login" || !user) return <>{children}</>;
-  if ((!user.isSuperAdmin && license.validate() !== "active") || pathname === "/subscription") return <>{children}</>;
+  if (!user.isSuperAdmin && remoteLicenseStatus !== "active") return <>{children}</>;
+  if (pathname === "/subscription") return <>{children}</>;
   if (user.isSuperAdmin && pathname === "/super-admin") return <>{children}</>;
   const nav = NAV.filter((item) => item.roles.includes(user.role));
   const renderNav = (mobile = false) => nav.map((item) => { const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to)); const Icon = item.icon; return <Link key={item.to} to={item.to} className={cn(mobile ? "flex flex-col items-center gap-1 py-2 text-[10px]" : "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", active ? "bg-sidebar-accent text-sidebar-primary font-semibold" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}><Icon className="w-4 h-4" /><span>{item.label}</span></Link>; });
