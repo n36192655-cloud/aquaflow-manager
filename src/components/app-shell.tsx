@@ -181,9 +181,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2">
-          <div className="md:hidden font-bold">ميزان</div>
-          <div className="hidden md:block text-xs text-muted-foreground">
-            {ROLE_LABEL[user.role]} — {user.name}
+          <div className="md:hidden font-bold truncate">{user.tenantName ?? "ميزان"}</div>
+          <div className="hidden md:block text-xs text-muted-foreground truncate">
+            {user.tenantName ? `${user.tenantName} · ` : ""}
+            {user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]} — {user.name}
           </div>
           <NetworkStatus />
         </header>
@@ -212,8 +213,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
           <button
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate({ to: "/login", replace: true });
             }}
             className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70"
