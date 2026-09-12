@@ -40,9 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (user.isSuperAdmin) { setRemoteLicenseStatus("active"); return () => { alive = false; }; }
     if (!user.tenantId) { setRemoteLicenseStatus("invalid"); return () => { alive = false; }; }
     setRemoteLicenseStatus(null);
-    void license.validateRemote(user.tenantId).then((status) => {
-      if (alive) setRemoteLicenseStatus(status);
-    });
+    void license.validateRemote(user.tenantId).then((status) => { if (alive) setRemoteLicenseStatus(status); });
     return () => { alive = false; };
   }, [user?.tenantId, user?.isSuperAdmin]);
   useEffect(() => {
@@ -60,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (pathname === "/login" || !user) return <>{children}</>;
   if (!user.isSuperAdmin && remoteLicenseStatus === null && pathname !== "/subscription") return <div className="min-h-screen grid place-items-center bg-background text-foreground"><div className="text-sm text-muted-foreground">جارٍ التحقق من اشتراك المشروع…</div></div>;
-  if (!user.isSuperAdmin && remoteLicenseStatus !== "active" && pathname !== "/subscription") return <>{children}</>;
+  if (!user.isSuperAdmin && remoteLicenseStatus !== "active" && pathname !== "/subscription") return <div className="min-h-screen grid place-items-center bg-background text-foreground"><div className="text-center space-y-2"><div className="text-sm font-semibold">الوصول التشغيلي متوقف</div><div className="text-xs text-muted-foreground">يجب أن يكون اشتراك المشروع نشطاً للوصول إلى بيانات التشغيل.</div></div></div>;
   if (pathname === "/subscription") return <>{children}</>;
   if (user.isSuperAdmin && pathname === "/super-admin") return <>{children}</>;
   const nav = NAV.filter((item) => item.roles.includes(user.role));
@@ -70,10 +68,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-l border-sidebar-border">
       <div className="px-5 py-6 border-b border-sidebar-border"><div className="flex items-center gap-2"><div className="relative w-9 h-9 rounded-xl grid place-items-center bg-water"><Droplets className="w-5 h-5 text-white" /></div><div><div className="text-lg font-bold tracking-tight">ميزان</div><div className="text-[11px] text-sidebar-foreground/70">منصة ميزان لإستدامة خدمات المياه</div></div></div>{tenant && <div className="mt-4 rounded-lg bg-sidebar-accent/60 px-3 py-2"><div className="text-[10px] text-sidebar-foreground/60">المشروع الحالي</div><div className="text-sm font-bold truncate" title={tenant.name}>{tenant.name}</div></div>}</div>
       <nav className="flex-1 px-3 py-4 space-y-1">{renderNav()}</nav>
-      <div className="px-4 py-4 border-t border-sidebar-border space-y-2"><div className="text-xs"><div className="font-semibold">{user.name}</div><div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div></div><button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"><LogOut className="w-3 h-3" /> تسجيل الخروج</button><div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">تعز — اليمن · منصة ميزان لإستدامة خدمات المياه</div></div>
+      <div className="px-4 py-4 border-t border-sidebar-border space-y-2"><div className="text-xs"><div className="font-semibold">{user.name}</div><div className="text-sidebar-foreground/60">{user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]}</div></div><button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"><LogOut className="w-3 h-3" /> تسجيل الخروج</button><div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">منصة ميزان لإستدامة خدمات المياه</div></div>
     </aside>
     <div className="flex-1 flex flex-col min-w-0">
-      <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2"><div className="md:hidden font-bold truncate">{tenant?.name ?? "منصة ميزان لإستدامة خدمات المياه"}</div><div className="hidden md:flex items-center gap-3 text-xs"><span className="font-bold">{tenant?.name ?? "غير محدد"}</span><span className="text-muted-foreground">{ROLE_LABEL[user.role]} — {user.name}</span></div><NetworkStatus /></header>
+      <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2"><div className="md:hidden font-bold truncate">{tenant?.name ?? "منصة ميزان لإستدامة خدمات المياه"}</div><div className="hidden md:flex items-center gap-3 text-xs"><span className="font-bold">{tenant?.name ?? "غير محدد"}</span><span className="text-muted-foreground">{user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]} — {user.name}</span></div><NetworkStatus /></header>
       <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto">{children}</main>
       <CopyrightFooter className="border-t" />
       <nav className="md:hidden sticky bottom-0 grid bg-sidebar text-sidebar-foreground border-t border-sidebar-border" style={{ gridTemplateColumns: `repeat(${nav.length + 1}, minmax(0, 1fr))` }}>{renderNav(true)}<button onClick={() => { logout(); navigate({ to: "/login", replace: true }); }} className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70"><LogOut className="w-4 h-4" /><span>خروج</span></button></nav>
