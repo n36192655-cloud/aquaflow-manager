@@ -31,19 +31,12 @@ function SubscriptionPage() {
     lic.validateRemote().then((status) => {
       setCurrentStatus(status);
     });
+    // لوحة الصيانة تُفتح فقط لمالك المنصة عبر تحقق قاعدة البيانات (is_super_admin)
+    void supabase.rpc("is_super_admin").then(({ data }) => {
+      setIsAdminUnlocked(data === true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function unlockAdminPanel() {
-    const password = prompt(
-      "🔒 يرجى إدخال رمز المطور (Indicatorz Master Key) لفتح لوحة الصيانة والتحكم عن بعد:",
-    );
-    if (password !== "indicatorz@2026") {
-      toast.error("رمز المطور غير صحيح!");
-      return;
-    }
-    setIsAdminUnlocked(true);
-    toast.success("🔐 تم تفعيل صلاحيات الإدارة السحابية الموحدة");
-  }
 
   // Toggles the tenant subscription between active and suspended (super-admin only).
   async function toggleRemoteBilling() {
