@@ -119,9 +119,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold tracking-tight">ميزان</div>
-              <div className="text-[11px] text-sidebar-foreground/60">منصة إدارة العدادات</div>
+              <div className="text-[11px] text-sidebar-foreground/60 truncate">
+                {user.tenantName ?? "منصة إدارة العدادات"}
+              </div>
             </div>
           </div>
         </div>
