@@ -48,9 +48,14 @@ function LoginPage() {
   const [role, setRole] = useState<Role>("admin");
   const [name, setName] = useState("manager");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) navigate({ to: defaultRouteFor(user.role), replace: true });
+    if (!user) return;
+    navigate({
+      to: user.isSuperAdmin ? "/super-admin" : defaultRouteFor(user.role),
+      replace: true,
+    });
   }, [user, navigate]);
 
   return (
