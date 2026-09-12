@@ -150,21 +150,31 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="px-4 py-4 border-t border-sidebar-border space-y-2">
+          {user.isSuperAdmin && (
+            <Link
+              to="/super-admin"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
+            >
+              <ShieldCheck className="w-3 h-3" /> لوحة مالك المنصة
+            </Link>
+          )}
           <div className="text-xs">
             <div className="font-semibold text-sidebar-foreground">{user.name}</div>
-            <div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div>
+            <div className="text-sidebar-foreground/60">
+              {user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]}
+            </div>
           </div>
           <button
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate({ to: "/login", replace: true });
             }}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
           >
             <LogOut className="w-3 h-3" /> تسجيل الخروج
           </button>
-          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">
-            تعز — اليمن · إصدار 2.0
+          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60 truncate">
+            {user.tenantName ? `${user.tenantName} · ` : ""}إصدار 2.0
           </div>
         </div>
       </aside>
