@@ -5,13 +5,13 @@ const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
 const ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
 const TEMPLATE_NAME = Deno.env.get("WHATSAPP_INVOICE_TEMPLATE") ?? "mizan_invoice_issued";
 const TEMPLATE_LANGUAGE = Deno.env.get("WHATSAPP_INVOICE_TEMPLATE_LANGUAGE") ?? "ar";
+const WEBHOOK_SECRET = Deno.env.get("WHATSAPP_WEBHOOK_SECRET");
 
 interface WebhookPayload {
   type?: string;
   table?: string;
   schema?: string;
   record?: { id?: string };
-  old_record?: unknown;
 }
 
 function json(status: number, body: Record<string, unknown>) {
@@ -21,10 +21,21 @@ function json(status: number, body: Record<string, unknown>) {
   });
 }
 
+function safeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
+}
+
 export default {
-  fetch: withSupabase({ auth: "secret:whatsapp_webhook" }, async (req, ctx) => {
+  fetch: withSupabase({ auth: "none" }, async (req, ctx) => {
     if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
+    if (!WEBHOOK_SECRET) return json(503, { error: "webhook_not_configured" });
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return json(503, { error: "whatsapp_not_configured" });
+
+    const suppliedSecret = req.headers.get("x-mizan-webhook-secret") ?? "";
+    if (!safeEqual(suppliedSecret, WEBHOOK_SECRET)) return json(401, { error: "unauthorized" });
 
     let payload: WebhookPayload;
     try {
@@ -40,20 +51,15 @@ export default {
     const outboxId = payload.record?.id;
     if (!outboxId) return json(400, { error: "missing_outbox_id" });
 
-    const { data: job, error: readError } = await ctx.supabaseAdmin
-      .from("whatsapp_invoice_outbox")
-      .select("id,bill_id,tenant_id,customer_name,phone,total,arrears,issued_at,status,attempts")
-      .eq("id", outboxId)
-      .maybeSingle();
+    const { data: jobs, error: claimError } = await ctx.supabase.rpc("claim_whatsapp_invoice", {
+      p_outbox_id: outboxId,
+      p_webhook_secret: WEBHOOK_SECRET,
+    });
 
-    if (readError) return json(500, { error: "outbox_read_failed" });
-    if (!job) return json(404, { error: "outbox_not_found" });
+    if (claimError) return json(500, { error: "outbox_claim_failed" });
+    const job = Array.isArray(jobs) ? jobs[0] : jobs;
+    if (!job) return json(404, { error: "outbox_not_found_or_not_claimable" });
     if (job.status === "sent") return json(200, { ok: true, status: "already_sent" });
-
-    await ctx.supabaseAdmin
-      .from("whatsapp_invoice_outbox")
-      .update({ status: "sending", attempts: Number(job.attempts ?? 0) + 1, last_attempt_at: new Date().toISOString() })
-      .eq("id", job.id);
 
     const response = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`, {
       method: "POST",
@@ -86,16 +92,20 @@ export default {
 
     const responseText = await response.text();
     let responseJson: Record<string, unknown> = {};
-    try { responseJson = JSON.parse(responseText); } catch { /* keep raw response below */ }
+    try { responseJson = JSON.parse(responseText); } catch { /* raw response is stored as an error message */ }
 
     if (!response.ok) {
       const errorMessage = typeof responseJson.error === "object" && responseJson.error !== null
         ? String((responseJson.error as { message?: unknown }).message ?? responseText).slice(0, 1000)
         : responseText.slice(0, 1000);
-      await ctx.supabaseAdmin
-        .from("whatsapp_invoice_outbox")
-        .update({ status: "failed", last_error: errorMessage, provider_response: responseJson })
-        .eq("id", job.id);
+      await ctx.supabase.rpc("complete_whatsapp_invoice", {
+        p_outbox_id: outboxId,
+        p_webhook_secret: WEBHOOK_SECRET,
+        p_status: "failed",
+        p_provider_message_id: null,
+        p_provider_response: responseJson,
+        p_last_error: errorMessage,
+      });
       return json(502, { error: "whatsapp_send_failed" });
     }
 
@@ -103,11 +113,16 @@ export default {
       ? String((responseJson.messages[0] as { id?: unknown })?.id ?? "")
       : "";
 
-    await ctx.supabaseAdmin
-      .from("whatsapp_invoice_outbox")
-      .update({ status: "sent", sent_at: new Date().toISOString(), provider_message_id: messageId || null, provider_response: responseJson, last_error: null })
-      .eq("id", job.id);
+    const { error: completeError } = await ctx.supabase.rpc("complete_whatsapp_invoice", {
+      p_outbox_id: outboxId,
+      p_webhook_secret: WEBHOOK_SECRET,
+      p_status: "sent",
+      p_provider_message_id: messageId || null,
+      p_provider_response: responseJson,
+      p_last_error: null,
+    });
 
+    if (completeError) return json(500, { error: "outbox_complete_failed" });
     return json(200, { ok: true, status: "sent", message_id: messageId || null });
   }),
 };
