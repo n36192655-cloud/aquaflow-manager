@@ -163,12 +163,9 @@ function SubscriptionGuard({ children }: { children: ReactNode }) {
           if (alive) setState("ok"); // Public routes (login) handle their own gating
           return;
         }
-        // Super admins are never locked out
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userData.user.id);
-        if ((roles ?? []).some((r: { role: string }) => r.role === "super_admin")) {
+        // Super admins are never locked out (server-side check)
+        const { data: isSuper } = await supabase.rpc("is_super_admin");
+        if (isSuper === true) {
           if (alive) setState("ok");
           return;
         }

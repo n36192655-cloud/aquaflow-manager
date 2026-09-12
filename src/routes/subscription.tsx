@@ -31,19 +31,12 @@ function SubscriptionPage() {
     lic.validateRemote().then((status) => {
       setCurrentStatus(status);
     });
+    // لوحة الصيانة تُفتح فقط لمالك المنصة عبر تحقق قاعدة البيانات (is_super_admin)
+    void supabase.rpc("is_super_admin").then(({ data }) => {
+      setIsAdminUnlocked(data === true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function unlockAdminPanel() {
-    const password = prompt(
-      "🔒 يرجى إدخال رمز المطور (Indicatorz Master Key) لفتح لوحة الصيانة والتحكم عن بعد:",
-    );
-    if (password !== "indicatorz@2026") {
-      toast.error("رمز المطور غير صحيح!");
-      return;
-    }
-    setIsAdminUnlocked(true);
-    toast.success("🔐 تم تفعيل صلاحيات الإدارة السحابية الموحدة");
-  }
 
   // Toggles the tenant subscription between active and suspended (super-admin only).
   async function toggleRemoteBilling() {
@@ -95,12 +88,11 @@ function SubscriptionPage() {
       <div className="flex-1 grid place-items-center px-4 py-10">
         <div className="w-full max-w-lg space-y-4">
           <Card className="border-border shadow-xl relative overflow-hidden">
-            <button
-              onClick={unlockAdminPanel}
-              className="absolute top-4 left-4 text-muted-foreground/10 hover:text-primary/40 transition-colors"
-            >
-              <KeyRound className="w-4 h-4" />
-            </button>
+            {isAdminUnlocked && (
+              <span className="absolute top-4 left-4 text-primary/40">
+                <KeyRound className="w-4 h-4" />
+              </span>
+            )}
 
             <CardHeader className="text-center">
               <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2 bg-primary/10">

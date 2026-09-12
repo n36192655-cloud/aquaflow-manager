@@ -48,9 +48,14 @@ function LoginPage() {
   const [role, setRole] = useState<Role>("admin");
   const [name, setName] = useState("manager");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) navigate({ to: defaultRouteFor(user.role), replace: true });
+    if (!user) return;
+    navigate({
+      to: user.isSuperAdmin ? "/super-admin" : defaultRouteFor(user.role),
+      replace: true,
+    });
   }, [user, navigate]);
 
   return (
@@ -117,34 +122,46 @@ function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="1234 (تجريبية)"
+                placeholder="كلمة المرور"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                النظام يعمل بدون إنترنت — كلمة المرور التجريبية: 1234
+                الدخول يتم عبر حسابك السحابي المسجل لهذا المشروع فقط.
               </p>
             </div>
 
             <Button
               className="w-full"
               size="lg"
+              disabled={busy}
               onClick={async () => {
-                const ok = await login(name, role, password);
+                setBusy(true);
+                const ok = await login(name, password);
+                setBusy(false);
                 if (!ok) {
                   const err = (useAuth.getState() as { loginError: string | null }).loginError;
                   if (err === "seat_limit")
-                    return toast.error("تم بلوغ الحد الأقصى للمستخدمين المتزامنين لهذه المؤسسة");
+                    return toast.error("تم بلوغ الحد الأقصى للأجهزة المسموح بها لهذا المشروع");
                   if (err === "expired") return toast.error("الاشتراك منتهي — يرجى تجديد الترخيص");
+                  if (err === "suspended")
+                    return toast.error("الاشتراك معلّق — تواصل مع مالك المنصة");
+                  if (err === "no_membership")
+                    return toast.error("هذا الحساب غير مرتبط بمشروع مياه أو دور صالح");
                   if (err === "invalid")
                     return toast.error("الترخيص غير صالح على هذا الجهاز/النطاق");
-                  return toast.error("بيانات غير صحيحة");
+                  return toast.error("بيانات الدخول غير صحيحة");
                 }
-                toast.success(`مرحباً ${name} — ${ROLE_LABEL[role]}`);
-                const isSuper = (useAuth.getState() as { user: { isSuperAdmin?: boolean } | null })
-                  .user?.isSuperAdmin;
-                navigate({ to: isSuper ? "/super-admin" : defaultRouteFor(role), replace: true });
+                const signedIn = (
+                  useAuth.getState() as { user: import("@/lib/auth").AuthUser | null }
+                ).user;
+                if (!signedIn) return;
+                toast.success(`مرحباً ${signedIn.name} — ${ROLE_LABEL[signedIn.role]}`);
+                navigate({
+                  to: signedIn.isSuperAdmin ? "/super-admin" : defaultRouteFor(signedIn.role),
+                  replace: true,
+                });
               }}
             >
-              دخول
+              {busy ? "جارٍ التحقق..." : "دخول"}
             </Button>
             {mounted && licStatus !== "active" && (
               <p className="text-xs text-destructive text-center">

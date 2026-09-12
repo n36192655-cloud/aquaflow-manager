@@ -35,7 +35,7 @@ const NAV: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { user, logout, heartbeat } = useAuth();
+  const { user, logout, heartbeat, hydrateFromSupabase } = useAuth();
   const online = useOnlineStatus();
   const license = useLicense();
 
@@ -44,13 +44,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     license.initIfNeeded();
   }, [license]);
 
+  // Re-validate the persisted identity against Supabase Auth on mount, so a
+  // stale local snapshot can never grant access to operational tenant data.
+  useEffect(() => {
+    if (pathname === "/login") return;
+    void hydrateFromSupabase().then((u) => {
+      if (!u) navigate({ to: "/login", replace: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // License validation gate — locks the app when subscription expires / invalid
   useEffect(() => {
     const status = license.validate();
-    if (status !== "active" && pathname !== "/subscription" && pathname !== "/login") {
+    if (
+      status !== "active" &&
+      pathname !== "/subscription" &&
+      pathname !== "/login" &&
+      !user?.isSuperAdmin
+    ) {
       navigate({ to: "/subscription", replace: true });
     }
-  }, [pathname, license, navigate]);
+  }, [pathname, license, navigate, user?.isSuperAdmin]);
 
   // Route protection
   useEffect(() => {
@@ -60,6 +75,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
     if (pathname === "/subscription") return; // always accessible when signed in
+    if (pathname.startsWith("/super-admin")) {
+      if (!user.isSuperAdmin) navigate({ to: defaultRouteFor(user.role), replace: true });
+      return;
+    }
     if (!canAccess(user.role, pathname)) {
       navigate({ to: defaultRouteFor(user.role), replace: true });
     }
@@ -100,9 +119,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-lg font-bold tracking-tight">ميزان</div>
-              <div className="text-[11px] text-sidebar-foreground/60">منصة إدارة العدادات</div>
+              <div className="text-[11px] text-sidebar-foreground/60 truncate">
+                {user.tenantName ?? "منصة إدارة العدادات"}
+              </div>
             </div>
           </div>
         </div>
@@ -129,30 +150,41 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="px-4 py-4 border-t border-sidebar-border space-y-2">
+          {user.isSuperAdmin && (
+            <Link
+              to="/super-admin"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
+            >
+              <ShieldCheck className="w-3 h-3" /> لوحة مالك المنصة
+            </Link>
+          )}
           <div className="text-xs">
             <div className="font-semibold text-sidebar-foreground">{user.name}</div>
-            <div className="text-sidebar-foreground/60">{ROLE_LABEL[user.role]}</div>
+            <div className="text-sidebar-foreground/60">
+              {user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]}
+            </div>
           </div>
           <button
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate({ to: "/login", replace: true });
             }}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
           >
             <LogOut className="w-3 h-3" /> تسجيل الخروج
           </button>
-          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60">
-            تعز — اليمن · إصدار 2.0
+          <div className="text-[10px] text-sidebar-foreground/50 pt-2 border-t border-sidebar-border/60 truncate">
+            {user.tenantName ? `${user.tenantName} · ` : ""}إصدار 2.0
           </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-card border-b px-4 py-2 flex items-center justify-between gap-2">
-          <div className="md:hidden font-bold">ميزان</div>
-          <div className="hidden md:block text-xs text-muted-foreground">
-            {ROLE_LABEL[user.role]} — {user.name}
+          <div className="md:hidden font-bold truncate">{user.tenantName ?? "ميزان"}</div>
+          <div className="hidden md:block text-xs text-muted-foreground truncate">
+            {user.tenantName ? `${user.tenantName} · ` : ""}
+            {user.isSuperAdmin ? "مالك المنصة" : ROLE_LABEL[user.role]} — {user.name}
           </div>
           <NetworkStatus />
         </header>
@@ -181,8 +213,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
           <button
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate({ to: "/login", replace: true });
             }}
             className="flex flex-col items-center gap-1 py-2 text-[10px] text-sidebar-foreground/70"
