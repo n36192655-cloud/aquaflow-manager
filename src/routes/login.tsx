@@ -142,15 +142,17 @@ function LoginPage() {
                   if (err === "seat_limit")
                     return toast.error("تم بلوغ الحد الأقصى للأجهزة المسموح بها لهذا المشروع");
                   if (err === "expired") return toast.error("الاشتراك منتهي — يرجى تجديد الترخيص");
-                  if (err === "suspended") return toast.error("الاشتراك معلّق — تواصل مع مالك المنصة");
+                  if (err === "suspended")
+                    return toast.error("الاشتراك معلّق — تواصل مع مالك المنصة");
                   if (err === "no_membership")
                     return toast.error("هذا الحساب غير مرتبط بمشروع مياه أو دور صالح");
                   if (err === "invalid")
                     return toast.error("الترخيص غير صالح على هذا الجهاز/النطاق");
                   return toast.error("بيانات الدخول غير صحيحة");
                 }
-                const signedIn = (useAuth.getState() as { user: import("@/lib/auth").AuthUser | null })
-                  .user;
+                const signedIn = (
+                  useAuth.getState() as { user: import("@/lib/auth").AuthUser | null }
+                ).user;
                 if (!signedIn) return;
                 toast.success(`مرحباً ${signedIn.name} — ${ROLE_LABEL[signedIn.role]}`);
                 navigate({

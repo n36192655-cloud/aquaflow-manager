@@ -94,8 +94,6 @@ function SubscriptionPage() {
               </span>
             )}
 
-
-
             <CardHeader className="text-center">
               <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2 bg-primary/10">
                 <Lock className="w-6 h-6 text-primary" />
