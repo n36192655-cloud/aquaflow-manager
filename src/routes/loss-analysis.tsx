@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +22,11 @@ const LOSS_THRESHOLD = 15;
 type ProductionLog = {
   id: string;
   recorded_at: string;
-  volume: number | null;
-  notes: string | null;
+  source_name: string;
+  production_m3: number | string | null;
+  note: string | null;
+  capture_source: string;
+  created_by: string | null;
   verification_status: "pending" | "approved" | "rejected";
 };
 
@@ -35,74 +38,130 @@ type Reading = {
   status: string;
 };
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function monthAgoISO() {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
   return d.toISOString().slice(0, 10);
 }
 
+function endExclusiveISO(date: string) {
+  return new Date(`${date}T00:00:00`).getTime() + 86400000 > 0
+    ? new Date(new Date(`${date}T00:00:00`).getTime() + 86400000).toISOString()
+    : new Date().toISOString();
+}
+
 function LossAnalysisPage() {
   const { user } = useAuth();
   const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
   const [units, setUnits] = useState("");
+  const [sourceName, setSourceName] = useState("");
   const [note, setNote] = useState("");
   const [from, setFrom] = useState(monthAgoISO());
   const [to, setTo] = useState(todayISO());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [consumed, setConsumed] = useState(0);
+  const [readingCount, setReadingCount] = useState(0);
 
   const loadData = useCallback(async () => {
     if (!user?.tenantId || user.isSuperAdmin) {
       setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
+      setLoading(false);
+      return;
+    }
+
+    if (from > to) {
+      setError("تاريخ البداية يجب أن يكون قبل أو يساوي تاريخ النهاية.");
+      setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     setError(null);
+    const start = new Date(`${from}T00:00:00`).toISOString();
+    const end = endExclusiveISO(to);
+
     const [productionResult, readingsResult] = await Promise.all([
       supabase
         .from("water_production_logs")
-        .select("id,recorded_at,volume,notes,verification_status")
+        .select("id,recorded_at,source_name,production_m3,note,capture_source,created_by,verification_status")
         .eq("tenant_id", user.tenantId)
+        .gte("recorded_at", start)
+        .lt("recorded_at", end)
         .order("recorded_at", { ascending: false }),
       supabase
         .from("water_readings")
         .select("id,consumption,created_at,verification_status,status")
         .eq("tenant_id", user.tenantId)
-        .gte("created_at", new Date(`${from}T00:00:00`).toISOString())
-        .lt("created_at", new Date(`${to}T00:00:00`).getTime() + 86400000 > 0 ? new Date(new Date(`${to}T00:00:00`).getTime() + 86400000).toISOString() : new Date().toISOString()),
+        .eq("verification_status", "approved")
+        .eq("status", "approved")
+        .gte("created_at", start)
+        .lt("created_at", end),
     ]);
 
     if (productionResult.error || readingsResult.error) {
       console.error(productionResult.error ?? readingsResult.error);
       setError("تعذر تحميل بيانات فاقد المياه من قاعدة البيانات.");
       setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
       setLoading(false);
       return;
     }
 
     setProductionLogs((productionResult.data ?? []) as ProductionLog[]);
+    const validReadings = ((readingsResult.data ?? []) as Reading[]).filter(
+      (r) => Number.isFinite(Number(r.consumption)) && Number(r.consumption) >= 0,
+    );
+    setConsumed(validReadings.reduce((sum, r) => sum + Number(r.consumption), 0));
+    setReadingCount(validReadings.length);
     setLoading(false);
   }, [user?.tenantId, user?.isSuperAdmin, from, to]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   async function submit() {
-    if (!user?.tenantId || user.isSuperAdmin) return toast.error("لا يوجد مشروع تشغيلي مرتبط بالحساب");
+    if (!user?.tenantId || user.isSuperAdmin) {
+      toast.error("لا يوجد مشروع تشغيلي مرتبط بالحساب");
+      return;
+    }
+
     const n = Number(units);
-    if (!Number.isFinite(n) || n <= 0) return toast.error("أدخل قيمة إنتاج صحيحة أكبر من صفر");
-    if (n > 100000000) return toast.error("قيمة الإنتاج تتجاوز الحد التشغيلي المسموح");
+    const source = sourceName.trim();
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.error("أدخل قيمة إنتاج صحيحة أكبر من صفر");
+      return;
+    }
+    if (n > 100000000) {
+      toast.error("قيمة الإنتاج تتجاوز الحد التشغيلي المسموح");
+      return;
+    }
+    if (!source) {
+      toast.error("أدخل مصدر قياس الإنتاج");
+      return;
+    }
 
     setSaving(true);
     const { error: insertError } = await supabase.from("water_production_logs").insert({
       tenant_id: user.tenantId,
-      volume: n,
-      notes: note.trim() || null,
+      source_name: source,
+      production_m3: n,
+      capture_source: "field_manual",
+      note: note.trim() || null,
       recorded_at: new Date().toISOString(),
+      created_by: user.id,
       verification_status: "pending",
     });
     setSaving(false);
@@ -114,63 +173,41 @@ function LossAnalysisPage() {
     }
 
     setUnits("");
+    setSourceName("");
     setNote("");
-    if (fileRef.current) fileRef.current.value = "";
     toast.success("تم تسجيل الإنتاج وإرساله للمراجعة");
     await loadData();
   }
 
   const analytics = useMemo(() => {
-    const fromT = new Date(`${from}T00:00:00`).getTime();
-    const toT = new Date(`${to}T00:00:00`).getTime() + 86400000 - 1;
-    const inRange = (d: string) => {
-      const t = new Date(d).getTime();
-      return t >= fromT && t <= toT;
-    };
     const produced = productionLogs
-      .filter((p) => p.verification_status === "approved" && inRange(p.recorded_at) && Number.isFinite(Number(p.volume)) && Number(p.volume) > 0)
-      .reduce((sum, p) => sum + Number(p.volume), 0);
-    return { produced };
-  }, [productionLogs, from, to]);
+      .filter((p) => p.verification_status === "approved")
+      .map((p) => Number(p.production_m3))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .reduce((sum, value) => sum + value, 0);
+    const loss = Math.max(0, produced - consumed);
+    const pct = produced > 0 ? (loss / produced) * 100 : 0;
+    return { produced, loss, pct };
+  }, [productionLogs, consumed]);
 
-  const [consumed, setConsumed] = useState(0);
-  const [readingCount, setReadingCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadConsumption() {
-      if (!user?.tenantId || user.isSuperAdmin) {
-        setConsumed(0); setReadingCount(0); return;
-      }
-      const start = new Date(`${from}T00:00:00`).toISOString();
-      const end = new Date(new Date(`${to}T00:00:00`).getTime() + 86400000).toISOString();
-      const { data, error: readError } = await supabase
-        .from("water_readings")
-        .select("id,consumption,created_at,verification_status,status")
-        .eq("tenant_id", user.tenantId)
-        .eq("verification_status", "approved")
-        .eq("status", "approved")
-        .gte("created_at", start)
-        .lt("created_at", end);
-      if (cancelled) return;
-      if (readError) {
-        console.error(readError);
-        setConsumed(0); setReadingCount(0); return;
-      }
-      const valid = ((data ?? []) as Reading[]).filter((r) => Number.isFinite(Number(r.consumption)) && Number(r.consumption) >= 0);
-      setConsumed(valid.reduce((sum, r) => sum + Number(r.consumption), 0));
-      setReadingCount(valid.length);
-    }
-    void loadConsumption();
-    return () => { cancelled = true; };
-  }, [user?.tenantId, user?.isSuperAdmin, from, to]);
-
-  const loss = Math.max(0, analytics.produced - consumed);
-  const pct = analytics.produced > 0 ? (loss / analytics.produced) * 100 : 0;
-  const chartData = [{ name: "المياه (م³)", produced: analytics.produced, consumed, loss }];
+  const chartData = [{
+    name: "المياه (م³)",
+    produced: analytics.produced,
+    consumed,
+    loss: analytics.loss,
+  }];
 
   if (!user?.tenantId || user.isSuperAdmin) {
-    return <div dir="rtl"><Card><CardContent className="p-8 text-center"><h1 className="font-bold">لا يوجد مشروع تشغيلي مرتبط بالحساب</h1><p className="mt-2 text-sm text-muted-foreground">لا يتم عرض بيانات اصطناعية أو بيانات مشروع آخر.</p></CardContent></Card></div>;
+    return (
+      <div dir="rtl">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h1 className="font-bold">لا يوجد مشروع تشغيلي مرتبط بالحساب</h1>
+            <p className="mt-2 text-sm text-muted-foreground">لا يتم عرض بيانات اصطناعية أو بيانات مشروع آخر.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -193,6 +230,10 @@ function LossAnalysisPage() {
           <CardHeader><CardTitle className="text-base">تسجيل مدخل مياه جديد</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div>
+              <Label>مصدر القياس</Label>
+              <Input value={sourceName} onChange={(e) => setSourceName(e.target.value)} placeholder="مثال: عداد الإنتاج الرئيسي" disabled={saving} />
+            </div>
+            <div>
               <Label>حجم الإنتاج/الضخ (م³)</Label>
               <Input type="number" min="0" step="0.001" value={units} onChange={(e) => setUnits(e.target.value)} placeholder="مثال: 12500" disabled={saving} />
             </div>
@@ -201,9 +242,8 @@ function LossAnalysisPage() {
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مصدر القياس أو ملاحظة التشغيل" disabled={saving} />
             </div>
             <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-              سجل الإنتاج الحالي لا يحتوي حقلاً للصورة في قاعدة البيانات؛ لذلك لا يتم تخزين صورة وهمية أو Data URL داخل السجل.
+              لا يتم تخزين صورة أو Data URL لأن جدول سجلات الإنتاج الحالي لا يحتوي حقلاً للصورة.
             </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" aria-hidden="true" />
             <Button onClick={() => void submit()} className="w-full" disabled={saving}>
               <Droplets className="w-4 h-4 ms-1" /> {saving ? "جارٍ الحفظ…" : "حفظ وإرسال للمراجعة"}
             </Button>
@@ -218,7 +258,7 @@ function LossAnalysisPage() {
               <div><Label>إلى تاريخ</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
             <div className="pt-2">
-              <LossStat label="فاقد المياه" pct={pct} loss={loss} unit="م³" icon={<Droplets className="w-4 h-4" />} />
+              <LossStat label="فاقد المياه" pct={analytics.pct} loss={analytics.loss} unit="م³" icon={<Droplets className="w-4 h-4" />} />
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
               <div>مدخل معتمد: <span className="font-semibold text-foreground">{fmtNum(analytics.produced)} م³</span></div>
@@ -248,13 +288,13 @@ function LossAnalysisPage() {
         </CardContent>
       </Card>
 
-      {analytics.produced > 0 && pct > LOSS_THRESHOLD && (
+      {analytics.produced > 0 && analytics.pct > LOSS_THRESHOLD && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div className="text-sm">
               <div className="font-semibold">تنبيه — نسبة الفاقد تتجاوز العتبة التشغيلية</div>
-              <div className="text-muted-foreground mt-1">الفاقد الحسابي {pct.toFixed(1)}%. يجب تفسيره ميدانياً قبل اعتباره تسرباً أو فقداً فنياً.</div>
+              <div className="text-muted-foreground mt-1">الفاقد الحسابي {analytics.pct.toFixed(1)}%. يجب تفسيره ميدانياً قبل اعتباره تسرباً أو فقداً فنياً.</div>
             </div>
           </CardContent>
         </Card>
@@ -264,17 +304,18 @@ function LossAnalysisPage() {
         <CardHeader><CardTitle className="text-base">سجلات مدخل المياه</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {loading ? <p className="text-sm text-muted-foreground text-center py-6">جارٍ تحميل البيانات…</p> : productionLogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">لا توجد سجلات إنتاج في قاعدة البيانات.</p>
+            <p className="text-sm text-muted-foreground text-center py-6">لا توجد سجلات إنتاج في الفترة المحددة.</p>
           ) : productionLogs.map((p) => (
             <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg">
               <div className="w-10 h-10 bg-muted rounded grid place-items-center"><TrendingDown className="w-4 h-4 text-muted-foreground" /></div>
               <div className="flex-1 text-sm">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant={p.verification_status === "approved" ? "default" : "outline"}>{p.verification_status === "approved" ? "معتمد" : p.verification_status === "pending" ? "معلّق" : "مرفوض"}</Badge>
-                  <span className="font-semibold">{fmtNum(Number(p.volume ?? 0))} م³</span>
+                  <span className="font-semibold">{fmtNum(Number(p.production_m3 ?? 0))} م³</span>
+                  <span className="text-xs text-muted-foreground">{p.source_name}</span>
                   <span className="text-xs text-muted-foreground">{new Date(p.recorded_at).toLocaleString("ar-YE")}</span>
                 </div>
-                {p.notes && <div className="text-xs text-muted-foreground mt-0.5">{p.notes}</div>}
+                {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
               </div>
             </div>
           ))}
