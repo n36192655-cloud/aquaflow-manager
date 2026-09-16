@@ -49,9 +49,9 @@ function monthAgoISO() {
 }
 
 function endExclusiveISO(date: string) {
-  return new Date(`${date}T00:00:00`).getTime() + 86400000 > 0
-    ? new Date(new Date(`${date}T00:00:00`).getTime() + 86400000).toISOString()
-    : new Date().toISOString();
+  const start = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return new Date().toISOString();
+  return new Date(start.getTime() + 86400000).toISOString();
 }
 
 function LossAnalysisPage() {
@@ -154,20 +154,19 @@ function LossAnalysisPage() {
     }
 
     setSaving(true);
-    const { error: insertError } = await supabase.from("water_production_logs").insert({
-      tenant_id: user.tenantId,
-      source_name: source,
-      production_m3: n,
-      capture_source: "field_manual",
-      note: note.trim() || null,
-      recorded_at: new Date().toISOString(),
-      created_by: user.id,
-      verification_status: "pending",
+    const clientId = crypto.randomUUID();
+    const { error: rpcError } = await supabase.rpc("record_water_production", {
+      p_source_name: source,
+      p_production_m3: n,
+      p_capture_source: "field_manual",
+      p_note: note.trim() || null,
+      p_recorded_at: new Date().toISOString(),
+      p_client_id: clientId,
     });
     setSaving(false);
 
-    if (insertError) {
-      console.error(insertError);
+    if (rpcError) {
+      console.error(rpcError);
       toast.error("تعذر حفظ سجل الإنتاج");
       return;
     }
