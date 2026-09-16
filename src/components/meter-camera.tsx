@@ -4,6 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Camera, Loader2, ScanLine, X, ShieldAlert, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 
+export interface MeterProfileForOcr {
+  integerDigits: number;
+  decimalDigits: number;
+  registerOrder: "integer_then_decimal" | "decimal_then_integer";
+}
+
 export interface OcrResult {
   reading: number | null;
   serial: string | null;
@@ -11,23 +17,94 @@ export interface OcrResult {
   imageData: string;
   serialMatch: "match" | "mismatch" | "unknown";
   confidence: number;
+  readingCandidates: number;
 }
 
-interface Props { open: boolean; onClose: () => void; onCapture: (res: OcrResult) => void; expectedSerial?: string | null; }
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onCapture: (res: OcrResult) => void;
+  expectedSerial?: string | null;
+  profile?: MeterProfileForOcr | null;
+}
+
 function normalize(s: string): string { return s.toUpperCase().replace(/[^A-Z0-9]/g, ""); }
 
-function parseReading(raw: string): number | null {
-  // Preserve a decimal separator when OCR sees one. Never infer decimal places from colour.
-  const cleaned = raw.replace(/[٬،]/g, ",").replace(/[^0-9.,]/g, " ");
-  const candidates = cleaned.match(/\d+(?:[.,]\d+)?/g) ?? [];
-  if (!candidates.length) return null;
-  const candidate = candidates.sort((a, b) => b.replace(/\D/g, "").length - a.replace(/\D/g, "").length)[0];
+function digitCount(value: string): number { return value.replace(/\D/g, "").length; }
+
+function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null): number | null {
   const normalized = candidate.replace(/,/g, ".");
-  const n = Number(normalized);
+  const parts = normalized.split(".");
+  if (parts.length > 2 || parts.some((part) => !/^\d+$/.test(part))) return null;
+
+  const digits = digitCount(normalized);
+  if (!profile) {
+    if (parts.length !== 1) {
+      const n = Number(normalized);
+      return Number.isFinite(n) ? n : null;
+    }
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  const integerDigits = Math.max(0, profile.integerDigits || 0);
+  const decimalDigits = Math.max(0, profile.decimalDigits || 0);
+
+  if (decimalDigits === 0) {
+    if (parts.length !== 1 || (integerDigits > 0 && digits !== integerDigits)) return null;
+    const n = Number(parts[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (parts.length === 2) {
+    const left = parts[0];
+    const right = parts[1];
+    if (profile.registerOrder === "integer_then_decimal") {
+      if ((integerDigits > 0 && left.length !== integerDigits) || right.length !== decimalDigits) return null;
+      const n = Number(`${left}.${right}`);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (left.length !== decimalDigits || (integerDigits > 0 && right.length !== integerDigits)) return null;
+    const n = Number(`${right}.${left}`);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  if (digits !== integerDigits + decimalDigits) return null;
+  if (profile.registerOrder === "integer_then_decimal") {
+    const split = integerDigits;
+    if (split <= 0 || split >= candidate.length) return null;
+    const integerPart = candidate.slice(0, split);
+    const decimalPart = candidate.slice(split);
+    const n = Number(`${integerPart}.${decimalPart}`);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  const split = decimalDigits;
+  if (split <= 0 || split >= candidate.length) return null;
+  const decimalPart = candidate.slice(0, split);
+  const integerPart = candidate.slice(split);
+  const n = Number(`${integerPart}.${decimalPart}`);
   return Number.isFinite(n) ? n : null;
 }
 
-async function recognizeImage(image: HTMLCanvasElement | HTMLImageElement): Promise<{ raw: string; reading: number | null; serial: string | null; confidence: number }> {
+function parseReading(raw: string, profile?: MeterProfileForOcr | null, expectedSerial?: string | null): { reading: number | null; candidates: number } {
+  const cleaned = raw.replace(/[٬،]/g, ",").replace(/[^0-9.,]/g, " ");
+  const tokens = cleaned.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  const expected = expectedSerial ? normalize(expectedSerial) : "";
+  const valid: number[] = [];
+
+  for (const token of tokens) {
+    const tokenDigits = normalize(token);
+    if (expected && tokenDigits && (tokenDigits === expected || expected.includes(tokenDigits))) continue;
+    const value = parseCandidate(token, profile);
+    if (value != null) valid.push(value);
+  }
+
+  const unique = [...new Set(valid)];
+  return { reading: unique.length === 1 ? unique[0] : null, candidates: unique.length };
+}
+
+async function recognizeImage(image: HTMLCanvasElement | HTMLImageElement, profile?: MeterProfileForOcr | null, expectedSerial?: string | null): Promise<{ raw: string; reading: number | null; serial: string | null; confidence: number; candidates: number }> {
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng", 1);
   try {
@@ -35,48 +112,120 @@ async function recognizeImage(image: HTMLCanvasElement | HTMLImageElement): Prom
     const { data } = await worker.recognize(image);
     const raw = (data.text || "").trim();
     const serial = raw.match(/[A-Z]{0,3}-?\d{3,10}/i)?.[0]?.toUpperCase() ?? null;
-    return { raw, reading: parseReading(raw), serial, confidence: typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence / 100)) : 0 };
+    const parsed = parseReading(raw, profile, expectedSerial);
+    return {
+      raw,
+      reading: parsed.reading,
+      serial,
+      candidates: parsed.candidates,
+      confidence: typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence / 100)) : 0,
+    };
   } finally { await worker.terminate(); }
 }
 
-export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props) {
-  const videoRef = useRef<HTMLVideoElement | null>(null); const canvasRef = useRef<HTMLCanvasElement | null>(null); const fileRef = useRef<HTMLInputElement | null>(null); const streamRef = useRef<MediaStream | null>(null);
-  const [ready, setReady] = useState(false); const [busy, setBusy] = useState(false); const [progress, setProgress] = useState(0);
+export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  useEffect(() => { if (!open) return; let cancelled = false; (async () => { try {
-    if (!navigator.mediaDevices?.getUserMedia) { toast.error("الكاميرا غير مدعومة في هذا المتصفح"); return; }
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-    if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
-    streamRef.current = stream; if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setReady(true); }
-  } catch { toast.error("تعذّر فتح الكاميرا. يمكنك اختيار صورة من الهاتف بدلاً منها."); } })();
-  return () => { cancelled = true; setReady(false); setBusy(false); setProgress(0); streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null; };
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) { toast.error("الكاميرا غير مدعومة في هذا المتصفح"); return; }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setReady(true); }
+      } catch { toast.error("تعذّر فتح الكاميرا. يمكنك اختيار صورة من الهاتف بدلاً منها."); }
+    })();
+    return () => {
+      cancelled = true;
+      setReady(false);
+      setBusy(false);
+      setProgress(0);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
   }, [open]);
 
   async function processCanvas(c: HTMLCanvasElement) {
-    setBusy(true); setProgress(10);
+    setBusy(true);
+    setProgress(10);
     try {
-      // Mild grayscale/contrast preprocessing improves digital displays without destroying red fractional registers.
-      const ctx = c.getContext("2d"); if (!ctx) throw new Error("no ctx");
-      const image = ctx.getImageData(0, 0, c.width, c.height); for (let i = 0; i < image.data.length; i += 4) { const y = 0.299*image.data[i] + 0.587*image.data[i+1] + 0.114*image.data[i+2]; image.data[i]=y; image.data[i+1]=y; image.data[i+2]=y; } ctx.putImageData(image,0,0);
-      setProgress(35); const result = await recognizeImage(c); setProgress(90);
-      let match: OcrResult["serialMatch"] = "unknown"; if (expectedSerial && result.serial) match = normalize(result.serial) === normalize(expectedSerial) ? "match" : "mismatch";
-      onCapture({ ...result, imageData: c.toDataURL("image/jpeg", 0.82), serialMatch: match });
-      if (result.confidence < 0.70 || result.reading == null) toast.warning("الثقة في القراءة غير كافية. راجع الصورة وأدخل القراءة يدوياً إذا لزم؛ النظام لا يخمّن.");
-    } catch (e) { console.error(e); toast.error("فشل التعرف على الصورة"); } finally { setBusy(false); setProgress(100); }
+      // Keep the original colour image. Colour semantics are meter metadata, not an OCR shortcut.
+      // OCR receives the unmodified image so a configured coloured register is not destroyed before review.
+      setProgress(35);
+      const result = await recognizeImage(c, profile, expectedSerial);
+      setProgress(90);
+      let match: OcrResult["serialMatch"] = "unknown";
+      if (expectedSerial && result.serial) match = normalize(result.serial) === normalize(expectedSerial) ? "match" : "mismatch";
+      onCapture({
+        reading: result.reading,
+        serial: result.serial,
+        raw: result.raw,
+        imageData: c.toDataURL("image/jpeg", 0.82),
+        serialMatch: match,
+        confidence: result.confidence,
+        readingCandidates: result.candidates,
+      });
+      if (match === "mismatch") toast.error("رقم العداد الملتقط لا يطابق العداد المختار؛ راجع الصورة قبل الحفظ.");
+      else if (result.candidates !== 1) toast.warning("لم يتم العثور على قراءة واحدة غير ملتبسة وفق مواصفة العداد؛ أدخل القراءة يدوياً.");
+      else if (result.confidence < 0.70) toast.warning("الثقة في OCR منخفضة؛ راجع القراءة يدوياً قبل الحفظ.");
+    } catch (e) {
+      console.error(e);
+      toast.error("فشل التعرف على الصورة");
+    } finally {
+      setBusy(false);
+      setProgress(100);
+    }
   }
 
-  async function capture() { if (!videoRef.current || !canvasRef.current) return; const v=videoRef.current,c=canvasRef.current; c.width=v.videoWidth||1280;c.height=v.videoHeight||720; const ctx=c.getContext("2d"); if(!ctx) return; ctx.drawImage(v,0,0,c.width,c.height); await processCanvas(c); }
+  async function capture() {
+    if (!videoRef.current || !canvasRef.current) return;
+    const v = videoRef.current;
+    const c = canvasRef.current;
+    c.width = v.videoWidth || 1280;
+    c.height = v.videoHeight || 720;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    await processCanvas(c);
+  }
 
   async function choosePhoneImage(file?: File) {
-    if (!file || !file.type.startsWith("image/")) return; setBusy(true); setProgress(10);
-    try { const url=URL.createObjectURL(file); const img=new Image(); img.onload=async()=>{ const c=document.createElement("canvas"); c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext("2d")?.drawImage(img,0,0); URL.revokeObjectURL(url); await processCanvas(c); }; img.src=url; } catch { setBusy(false); toast.error("تعذر قراءة صورة الهاتف"); }
+    if (!file || !file.type.startsWith("image/")) return;
+    setBusy(true);
+    setProgress(10);
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = async () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        c.getContext("2d")?.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        await processCanvas(c);
+      };
+      img.src = url;
+    } catch {
+      setBusy(false);
+      toast.error("تعذر قراءة صورة الهاتف");
+    }
   }
 
-  return <Dialog open={open} onOpenChange={(v)=>!v&&onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle className="flex items-center gap-2"><Camera className="w-4 h-4" /> تصوير العداد + التحقق البصري</DialogTitle></DialogHeader>
+  return <Dialog open={open} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle className="flex items-center gap-2"><Camera className="w-4 h-4" /> تصوير العداد + التحقق البصري</DialogTitle></DialogHeader>
     {expectedSerial && <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-primary" /><span>الرقم المتوقع للعداد: <span className="font-mono font-semibold" dir="ltr">{expectedSerial}</span></span></div>}
+    {profile && <div className="text-xs bg-muted/40 border rounded-md p-2">مواصفة القراءة: {profile.integerDigits} أرقام صحيحة + {profile.decimalDigits} أرقام عشرية · ترتيب السجل: {profile.registerOrder === "integer_then_decimal" ? "صحيح ثم عشري" : "عشري ثم صحيح"}</div>}
     <div className="relative rounded-lg overflow-hidden bg-black aspect-video"><video ref={videoRef} playsInline muted className="w-full h-full object-cover" /><canvas ref={canvasRef} className="hidden" /><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-16 border-2 border-yellow-400/80 rounded-md pointer-events-none" />{busy&&<div className="absolute inset-0 grid place-items-center bg-black/60 text-white text-sm"><Loader2 className="w-6 h-6 animate-spin" /><div>جارٍ تحليل الصورة… {progress}%</div></div>}</div>
-    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e)=>void choosePhoneImage(e.target.files?.[0])} />
-    <p className="text-xs text-muted-foreground">يدعم الكاميرا المباشرة أو صورة ملتقطة مسبقاً من الهاتف. للعدادات الميكانيكية/الدائرية أو الصورة منخفضة الثقة، تتم مراجعة القراءة يدوياً بدلاً من التخمين.</p>
-    <DialogFooter className="gap-2"><Button variant="outline" onClick={onClose} disabled={busy}><X className="w-4 h-4 ms-1" /> إلغاء</Button><Button variant="outline" onClick={()=>fileRef.current?.click()} disabled={busy}><ImagePlus className="w-4 h-4 ms-1" /> صورة من الهاتف</Button><Button onClick={()=>void capture()} disabled={!ready||busy}><ScanLine className="w-4 h-4 ms-1" /> التقاط وقراءة</Button></DialogFooter>
+    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void choosePhoneImage(e.target.files?.[0])} />
+    <p className="text-xs text-muted-foreground">OCR اقتراح فقط. لا يتم اعتماد القراءة تلقائياً؛ عند الغموض أو عدم مطابقة مواصفة العداد يجب مراجعتها وإدخالها يدوياً. ألوان السجل لا تُستخدم لاستنتاج الرقم.</p>
+    <DialogFooter className="gap-2"><Button variant="outline" onClick={onClose} disabled={busy}><X className="w-4 h-4 ms-1" /> إلغاء</Button><Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}><ImagePlus className="w-4 h-4 ms-1" /> صورة من الهاتف</Button><Button onClick={() => void capture()} disabled={!ready || busy}><ScanLine className="w-4 h-4 ms-1" /> التقاط وقراءة</Button></DialogFooter>
   </DialogContent></Dialog>;
 }
