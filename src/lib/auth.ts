@@ -50,7 +50,7 @@ function mapDbRole(dbRole: string | undefined): Role | null {
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       loginError: null,
 
@@ -61,7 +61,7 @@ export const useAuth = create<AuthState>()(
           set({ loginError: "bad_credentials" });
           return false;
         }
-        return useAuth.getState().loginWithSupabase(usernameToEmail(username), password);
+        return get().loginWithSupabase(usernameToEmail(username), password);
       },
 
       loginWithSupabase: async (email, password) => {
@@ -74,7 +74,7 @@ export const useAuth = create<AuthState>()(
           return false;
         }
 
-        const hydrated = await useAuth.getState().hydrateFromSupabase();
+        const hydrated = await get().hydrateFromSupabase();
         if (!hydrated) {
           await supabase.auth.signOut();
           set({ user: null, loginError: "no_membership" });
@@ -153,14 +153,14 @@ export const useAuth = create<AuthState>()(
       },
 
       logout: async () => {
-        const u = (useAuth.getState() as AuthState).user;
+        const u = get().user;
         if (u?.seatId) useLicense.getState().releaseSeat(u.seatId);
         set({ user: null, loginError: null });
         await supabase.auth.signOut();
       },
 
       heartbeat: () => {
-        const u = (useAuth.getState() as AuthState).user;
+        const u = get().user;
         if (u?.seatId) useLicense.getState().touchSeat(u.seatId);
       },
     }),
