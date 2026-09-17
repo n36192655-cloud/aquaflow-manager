@@ -30,20 +30,14 @@ interface Props {
 }
 
 function normalize(s: string): string { return s.toUpperCase().replace(/[^A-Z0-9]/g, ""); }
-
 function digitCount(value: string): number { return value.replace(/\D/g, "").length; }
 
 function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null): number | null {
+  if (!profile) return null;
   const normalized = candidate.replace(/,/g, ".");
   const parts = normalized.split(".");
   if (parts.length > 2 || parts.some((part) => !/^\d+$/.test(part))) return null;
-
   const digits = digitCount(normalized);
-  if (!profile) {
-    const n = Number(normalized);
-    return Number.isFinite(n) ? n : null;
-  }
-
   const integerDigits = Math.max(0, profile.integerDigits || 0);
   const decimalDigits = Math.max(0, profile.decimalDigits || 0);
 
@@ -92,7 +86,7 @@ function parseReading(raw: string, profile?: MeterProfileForOcr | null, expected
 
   for (const token of tokens) {
     const tokenDigits = normalize(token);
-    if (expected && tokenDigits && (tokenDigits === expected || expected.includes(tokenDigits))) continue;
+    if (expected && tokenDigits && tokenDigits === expected) continue;
     const value = parseCandidate(token, profile);
     if (value != null) valid.push(value);
   }
@@ -147,11 +141,10 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
         .eq("id", meter.profile_id)
         .maybeSingle();
       if (cancelled || profileError || !meterProfile) return;
-      const registerOrder = meterProfile.register_order === "decimal_then_integer" ? "decimal_then_integer" : "integer_then_decimal";
       setResolvedProfile({
         integerDigits: Number(meterProfile.integer_digits ?? 0),
         decimalDigits: Number(meterProfile.decimal_digits ?? 0),
-        registerOrder,
+        registerOrder: meterProfile.register_order === "decimal_then_integer" ? "decimal_then_integer" : "integer_then_decimal",
       });
     })().catch((error) => console.error("Unable to resolve meter OCR profile", error));
     return () => { cancelled = true; };
@@ -184,7 +177,6 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
     setProgress(10);
     try {
       // Keep the original colour image. Colour semantics are meter metadata, not an OCR shortcut.
-      // OCR receives the unmodified image so a configured coloured register is not destroyed before review.
       setProgress(35);
       const result = await recognizeImage(c, resolvedProfile, expectedSerial);
       setProgress(90);
