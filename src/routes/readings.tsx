@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { priceFor, fmtYER } from "@/lib/pricing";
-import { MeterCamera, type OcrResult } from "@/components/meter-camera";
+import { MeterCamera, type OcrResult, type MeterProfileSpec } from "@/components/meter-camera";
+import { supabase } from "@/integrations/supabase/client";
 import { useOnlineStatus, addPending } from "@/lib/sync";
 import { useAuth } from "@/lib/auth";
 import { SubscriberSearch } from "@/components/subscriber-search";
@@ -49,6 +50,7 @@ function ReadingsPage() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [ocrSerial, setOcrSerial] = useState<string | undefined>(undefined);
+  const [selectedProfile, setSelectedProfile] = useState<MeterProfileSpec | null>(null);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geo, setGeo] = useState<GeoFix | null>(null);
   const [tab, setTab] = useState<"input" | "pending" | "log" | "offline_cache">("input");
@@ -60,6 +62,36 @@ function ReadingsPage() {
         .sort((a, b) => +new Date(b.date) - +new Date(a.date))[0]
     : null;
   const selectedCustomer = selected ? customers.find((c) => c.id === selected.customer_id) : null;
+
+  // مواصفة العداد المحدد (integerDigits/decimalDigits/registerOrder) من قاعدة البيانات
+  useEffect(() => {
+    let cancelled = false;
+    setSelectedProfile(null);
+    const serial = selected?.number;
+    if (!serial) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("meters")
+          .select("meter_profiles(integer_digits, decimal_digits, register_order)")
+          .eq("serial_number", serial)
+          .maybeSingle();
+        if (cancelled || error || !data?.meter_profiles) return;
+        const p = data.meter_profiles;
+        setSelectedProfile({
+          integerDigits: p.integer_digits ?? 5,
+          decimalDigits: p.decimal_digits ?? 0,
+          registerOrder: p.register_order ?? "left",
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.number]);
+
 
   const pending = useMemo(
     () =>
@@ -325,6 +357,7 @@ function ReadingsPage() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleOcr}
         expectedSerial={selected?.number ?? null}
+        profile={selectedProfile}
       />
 
       {tab === "pending" && !isReader && (

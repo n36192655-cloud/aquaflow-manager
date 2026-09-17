@@ -18,18 +18,25 @@ export interface OcrResult {
   serialMatch: "match" | "mismatch" | "unknown";
 }
 
+export interface MeterProfileSpec {
+  integerDigits: number;
+  decimalDigits: number;
+  registerOrder: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onCapture: (res: OcrResult) => void;
   expectedSerial?: string | null;
+  profile?: MeterProfileSpec | null;
 }
 
 function normalize(s: string): string {
   return s.toUpperCase().replace(/[-\s]/g, "");
 }
 
-export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props) {
+export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -115,6 +122,16 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
         match = normalize(serial) === normalize(expectedSerial) ? "match" : "mismatch";
       }
 
+      if (profile && reading != null) {
+        const maxDigits = profile.integerDigits + (profile.decimalDigits || 0);
+        const digits = String(Math.abs(reading)).length;
+        if (digits > maxDigits) {
+          toast.warning(
+            `القراءة الملتقطة (${digits} خانات) تتجاوز مواصفة العداد (${profile.integerDigits} خانات صحيحة + ${profile.decimalDigits} عشرية) — تحقق يدوياً`,
+          );
+        }
+      }
+
       onCapture({ reading, serial, raw, imageData, serialMatch: match });
       if (reading == null) toast.warning("لم يُتعرَّف على أرقام واضحة — أعد المحاولة");
     } catch (e) {
@@ -140,6 +157,17 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props)
               الرقم المتوقع للعداد:{" "}
               <span className="font-mono font-semibold" dir="ltr">
                 {expectedSerial}
+              </span>
+            </span>
+          </div>
+        )}
+        {profile && (
+          <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-primary" />
+            <span>
+              مواصفة العداد:{" "}
+              <span className="font-mono font-semibold" dir="ltr">
+                {profile.integerDigits}+{profile.decimalDigits} · {profile.registerOrder}
               </span>
             </span>
           </div>
