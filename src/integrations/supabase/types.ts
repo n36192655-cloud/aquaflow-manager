@@ -499,42 +499,54 @@ export type Database = {
       water_production_logs: {
         Row: {
           capture_source: string
+          client_id: string | null
           created_at: string
           created_by: string | null
           id: string
           note: string | null
           production_m3: number
           recorded_at: string
+          review_reason: string | null
           source_name: string
           tenant_id: string
           updated_at: string
           verification_status: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           capture_source?: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           note?: string | null
           production_m3: number
           recorded_at?: string
+          review_reason?: string | null
           source_name: string
           tenant_id: string
           updated_at?: string
           verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           capture_source?: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           note?: string | null
           production_m3?: number
           recorded_at?: string
+          review_reason?: string | null
           source_name?: string
           tenant_id?: string
           updated_at?: string
           verification_status?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -703,6 +715,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_water_production: {
+        Args: { p_production_id: string }
+        Returns: {
+          production_id: string
+          verification_status: string
+        }[]
+      }
       approve_water_reading: {
         Args: { p_reading_id: string }
         Returns: {
@@ -714,12 +733,130 @@ export type Database = {
       can_access_tenant: { Args: { _tenant_id: string }; Returns: boolean }
       central_tenant_id: { Args: never; Returns: string }
       create_central_tenant: { Args: { _name: string }; Returns: string }
+      create_customer: {
+        Args: {
+          p_address?: string
+          p_name: string
+          p_pay_account?: string
+          p_phone?: string
+        }
+        Returns: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          pay_account: string | null
+          phone: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_meter: {
+        Args: {
+          p_customer_id: string
+          p_profile_id: string
+          p_serial_number: string
+        }
+        Returns: {
+          created_at: string
+          customer_id: string
+          id: string
+          installed_at: string | null
+          profile_id: string | null
+          serial_number: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "meters"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_meter_profile: {
+        Args: {
+          p_color_semantics?: Json
+          p_decimal_digits: number
+          p_display_type: string
+          p_integer_digits: number
+          p_name: string
+          p_register_order?: string
+        }
+        Returns: {
+          color_semantics: Json
+          created_at: string
+          decimal_digits: number
+          display_type: string
+          id: string
+          integer_digits: number
+          name: string
+          register_order: string
+          tenant_id: string
+          unit: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "meter_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_project_tenant: { Args: { _name: string }; Returns: string }
       current_billing_cycle: {
         Args: { p_at?: string; p_tenant: string }
         Returns: string
       }
       current_tenant_id: { Args: never; Returns: string }
+      deactivate_customer: {
+        Args: { p_customer_id: string }
+        Returns: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          pay_account: string | null
+          phone: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "customers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      deactivate_meter: {
+        Args: { p_meter_id: string }
+        Returns: {
+          created_at: string
+          customer_id: string
+          id: string
+          installed_at: string | null
+          profile_id: string | null
+          serial_number: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "meters"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -793,6 +930,21 @@ export type Database = {
           status: string
         }[]
       }
+      record_water_production: {
+        Args: {
+          p_capture_source?: string
+          p_client_id?: string
+          p_note?: string
+          p_production_m3: number
+          p_recorded_at?: string
+          p_source_name: string
+        }
+        Returns: {
+          client_id: string
+          production_id: string
+          verification_status: string
+        }[]
+      }
       record_water_reading: {
         Args: {
           p_accuracy?: number
@@ -841,6 +993,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      reject_water_production: {
+        Args: { p_production_id: string; p_reason: string }
+        Returns: {
+          production_id: string
+          verification_status: string
+        }[]
       }
       reject_water_reading: {
         Args: { p_reading_id: string; p_reason: string }
