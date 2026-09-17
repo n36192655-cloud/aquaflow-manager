@@ -217,23 +217,28 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
 
   async function choosePhoneImage(file?: File) {
     if (!file || !file.type.startsWith("image/")) return;
-    setBusy(true);
-    setProgress(10);
+    const url = URL.createObjectURL(file);
+    const img = new Image();
     try {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = async () => {
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        c.getContext("2d")?.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-        await processCanvas(c);
-      };
-      img.src = url;
-    } catch {
-      setBusy(false);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("IMAGE_LOAD_FAILED"));
+        img.src = url;
+      });
+
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx || c.width <= 0 || c.height <= 0) throw new Error("IMAGE_DIMENSIONS_INVALID");
+      ctx.drawImage(img, 0, 0);
+      await processCanvas(c);
+    } catch (error) {
+      console.error(error);
       toast.error("تعذر قراءة صورة الهاتف");
+    } finally {
+      URL.revokeObjectURL(url);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
