@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Camera, Loader2, ScanLine, X, ShieldAlert, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 export interface MeterProfileForOcr {
   integerDigits: number;
@@ -39,10 +40,6 @@ function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null):
 
   const digits = digitCount(normalized);
   if (!profile) {
-    if (parts.length !== 1) {
-      const n = Number(normalized);
-      return Number.isFinite(n) ? n : null;
-    }
     const n = Number(normalized);
     return Number.isFinite(n) ? n : null;
   }
@@ -128,9 +125,37 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [resolvedProfile, setResolvedProfile] = useState<MeterProfileForOcr | null>(profile ?? null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    setResolvedProfile(profile ?? null);
+    if (!open || profile || !expectedSerial) return;
+    let cancelled = false;
+    (async () => {
+      const { data: meter, error: meterError } = await supabase
+        .from("meters")
+        .select("profile_id")
+        .eq("serial_number", expectedSerial)
+        .maybeSingle();
+      if (cancelled || meterError || !meter?.profile_id) return;
+      const { data: meterProfile, error: profileError } = await supabase
+        .from("meter_profiles")
+        .select("integer_digits,decimal_digits,register_order")
+        .eq("id", meter.profile_id)
+        .maybeSingle();
+      if (cancelled || profileError || !meterProfile) return;
+      const registerOrder = meterProfile.register_order === "decimal_then_integer" ? "decimal_then_integer" : "integer_then_decimal";
+      setResolvedProfile({
+        integerDigits: Number(meterProfile.integer_digits ?? 0),
+        decimalDigits: Number(meterProfile.decimal_digits ?? 0),
+        registerOrder,
+      });
+    })().catch((error) => console.error("Unable to resolve meter OCR profile", error));
+    return () => { cancelled = true; };
+  }, [open, expectedSerial, profile]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,7 +186,7 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
       // Keep the original colour image. Colour semantics are meter metadata, not an OCR shortcut.
       // OCR receives the unmodified image so a configured coloured register is not destroyed before review.
       setProgress(35);
-      const result = await recognizeImage(c, profile, expectedSerial);
+      const result = await recognizeImage(c, resolvedProfile, expectedSerial);
       setProgress(90);
       let match: OcrResult["serialMatch"] = "unknown";
       if (expectedSerial && result.serial) match = normalize(result.serial) === normalize(expectedSerial) ? "match" : "mismatch";
@@ -222,7 +247,7 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
 
   return <Dialog open={open} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle className="flex items-center gap-2"><Camera className="w-4 h-4" /> تصوير العداد + التحقق البصري</DialogTitle></DialogHeader>
     {expectedSerial && <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-primary" /><span>الرقم المتوقع للعداد: <span className="font-mono font-semibold" dir="ltr">{expectedSerial}</span></span></div>}
-    {profile && <div className="text-xs bg-muted/40 border rounded-md p-2">مواصفة القراءة: {profile.integerDigits} أرقام صحيحة + {profile.decimalDigits} أرقام عشرية · ترتيب السجل: {profile.registerOrder === "integer_then_decimal" ? "صحيح ثم عشري" : "عشري ثم صحيح"}</div>}
+    {resolvedProfile && <div className="text-xs bg-muted/40 border rounded-md p-2">مواصفة القراءة: {resolvedProfile.integerDigits} أرقام صحيحة + {resolvedProfile.decimalDigits} أرقام عشرية · ترتيب السجل: {resolvedProfile.registerOrder === "integer_then_decimal" ? "صحيح ثم عشري" : "عشري ثم صحيح"}</div>}
     <div className="relative rounded-lg overflow-hidden bg-black aspect-video"><video ref={videoRef} playsInline muted className="w-full h-full object-cover" /><canvas ref={canvasRef} className="hidden" /><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-16 border-2 border-yellow-400/80 rounded-md pointer-events-none" />{busy&&<div className="absolute inset-0 grid place-items-center bg-black/60 text-white text-sm"><Loader2 className="w-6 h-6 animate-spin" /><div>جارٍ تحليل الصورة… {progress}%</div></div>}</div>
     <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void choosePhoneImage(e.target.files?.[0])} />
     <p className="text-xs text-muted-foreground">OCR اقتراح فقط. لا يتم اعتماد القراءة تلقائياً؛ عند الغموض أو عدم مطابقة مواصفة العداد يجب مراجعتها وإدخالها يدوياً. ألوان السجل لا تُستخدم لاستنتاج الرقم.</p>
