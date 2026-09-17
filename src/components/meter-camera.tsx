@@ -18,18 +18,25 @@ export interface OcrResult {
   serialMatch: "match" | "mismatch" | "unknown";
 }
 
+export interface MeterProfileSpec {
+  integerDigits: number;
+  decimalDigits: number;
+  registerOrder: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onCapture: (res: OcrResult) => void;
   expectedSerial?: string | null;
+  profile?: MeterProfileSpec | null;
 }
 
 function normalize(s: string): string {
   return s.toUpperCase().replace(/[-\s]/g, "");
 }
 
-export function MeterCamera({ open, onClose, onCapture, expectedSerial }: Props) {
+export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
