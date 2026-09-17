@@ -7,6 +7,10 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
 }
 
+function isSecretSupabaseApiKey(value: string): boolean {
+  return value.startsWith('sb_secret_');
+}
+
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
   return (input, init) => {
     const headers = new Headers(
@@ -44,6 +48,14 @@ function createSupabaseClient() {
       ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY/VITE_SUPABASE_ANON_KEY'] : []),
     ];
     const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Configure the Supabase public client variables for this deployment.`;
+    console.error(`[Supabase] ${message}`);
+    throw new Error(message);
+  }
+
+  // A secret key must never be shipped to browser JavaScript. VITE_* values are
+  // build-time public values, so fail closed if an operator misconfigures one.
+  if (typeof window !== 'undefined' && isSecretSupabaseApiKey(SUPABASE_PUBLISHABLE_KEY)) {
+    const message = 'Invalid Supabase client configuration: a secret key cannot be used in browser code.';
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
