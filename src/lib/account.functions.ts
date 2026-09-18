@@ -64,7 +64,7 @@ export const loginWithUsername = createServerFn({ method: "POST" })
     const ipKey = requestClientKey();
     const [usernameAllowed, ipAllowed] = await Promise.all([
       authRateAllowed(secret, "login-user", normalized, 5),
-      authRateAllowed(secret, "login-ip", ipKey, 30),
+      ipKey === "unknown" ? Promise.resolve(true) : authRateAllowed(secret, "login-ip", ipKey, 30),
     ]);
     if (!usernameAllowed || !ipAllowed) return authFailure();
     const { data: profile, error: profileError } = await secret
@@ -188,7 +188,7 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
     const ipKey = requestClientKey();
     const [usernameAllowed, ipAllowed] = await Promise.all([
       authRateAllowed(secret, "reset-user", normalized, 3),
-      authRateAllowed(secret, "reset-ip", ipKey, 10),
+      ipKey === "unknown" ? Promise.resolve(true) : authRateAllowed(secret, "reset-ip", ipKey, 10),
     ]);
     if (!usernameAllowed || !ipAllowed) return { ok: true };
     const { data: profile } = await secret
