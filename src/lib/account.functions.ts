@@ -76,7 +76,9 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
     ];
 
     const created: Array<z.infer<typeof CredentialsSchema>> = [];
+    const createdUserIds: string[] = [];
 
+    try {
     for (const item of roles) {
       const { data: existing } = await admin
         .from("user_roles")
@@ -92,6 +94,10 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
         if (!conflict) break;
         username = generateUsername(data.tenantName, item.role);
       }
+    } catch (error) {
+      await Promise.all(createdUserIds.map((id) => admin.auth.admin.deleteUser(id)));
+      throw error;
+    }
 
       const password = generateInitialPassword();
       const syntheticEmail = `${username}@mizan.local`;
@@ -114,10 +120,8 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
         p_role: item.role,
       });
 
-      if (linkError) {
-        await admin.auth.admin.deleteUser(createdAuth.user.id);
-        throw new Error(linkError.message);
-      }
+      if (linkError) throw new Error(linkError.message);
+      createdUserIds.push(createdAuth.user.id);
 
       created.push({
         username,
