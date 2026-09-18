@@ -31,7 +31,11 @@ export const useAuth = create<AuthState>()(persist((set) => ({
       return true;
     } catch (error) { console.error("[Mizan] authentication failed", error); set({ loginError: "not_configured" }); return false; }
   },
-  changePassword: async (currentPassword, newPassword) => {\n    if (!currentPassword || newPassword.length < 8) return false;\n    const { error } = await supabase.auth.updateUser({ current_password: currentPassword, password: newPassword });\n    return !error;\n  },
+  changePassword: async (currentPassword, newPassword) => {
+    if (!currentPassword || newPassword.length < 8) return false;
+    const { error } = await supabase.auth.updateUser({ current_password: currentPassword, password: newPassword });
+    return !error;
+  },
   logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut({ scope: "local" }); set({ user: null, loginError: null }); },
   hydrateFromSupabase: async () => {
     const { data: userData } = await supabase.auth.getUser();
