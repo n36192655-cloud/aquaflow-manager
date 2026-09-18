@@ -66,7 +66,7 @@ function SuperAdminDashboard() {
   async function provisionUsers(t: TenantRow) {
     setProvisioningTenantId(t.id);
     try {
-      const result = await provisionTenantUsers({ data: { tenantId: t.id, tenantName: t.name } });
+      const result = await provisionTenantUsers({ data: { tenantId: t.id } });
       setCredentialSets((prev) => ({ ...prev, [t.id]: result.credentials }));
       if (result.credentials.length === 0) toast.info("الحسابات الثلاثة موجودة بالفعل لهذا المشروع؛ لا يمكن عرض كلمات مرورها الحالية.");
       else toast.success(`تم إنشاء ${result.credentials.length} حسابات جديدة. كلمات المرور تظهر الآن فقط.`);
