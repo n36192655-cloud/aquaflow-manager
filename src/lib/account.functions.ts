@@ -21,7 +21,34 @@ const CredentialsSchema = z.object({
 
 const AUTH_FAILURE_DELAY_MS = 250;
 
-async function authFailure(): Promise<never> {
+
+async function opaqueRateKey(kind: string, value: string): Promise<string> {
+  const input = new TextEncoder().encode(`mizan-auth-rate-v1:${kind}:${value}`);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function authRateAllowed(
+  secret: ReturnType<typeof createSecretSupabaseClient>,
+  kind: string,
+  value: string,
+  limit: number,
+): Promise<boolean> {
+  const key = await opaqueRateKey(kind, value);
+  const { data, error } = await secret.rpc("consume_auth_rate_limit", {
+    p_rate_key: key,
+    p_limit: limit,
+    p_window_seconds: 900,
+  });
+  return !error && data === true;
+}
+
+function requestClientKey(): string {
+  const forwarded = getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim();
+  const vercelForwarded = getRequestHeader("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  return vercelForwarded || forwarded || "unknown";
+}
+\nasync function authFailure(): Promise<never> {
   await new Promise((resolve) => setTimeout(resolve, AUTH_FAILURE_DELAY_MS));
   throw new Error("bad_credentials");
 }
@@ -34,6 +61,12 @@ export const loginWithUsername = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const secret = createSecretSupabaseClient();
     const normalized = data.username.toLowerCase();
+    const ipKey = requestClientKey();
+    const [usernameAllowed, ipAllowed] = await Promise.all([
+      authRateAllowed(secret, "login-user", normalized, 5),
+      authRateAllowed(secret, "login-ip", ipKey, 30),
+    ]);
+    if (!usernameAllowed || !ipAllowed) return authFailure();
     const { data: profile, error: profileError } = await secret
       .from("profiles")
       .select("id")
@@ -152,6 +185,12 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const normalized = data.username.toLowerCase();
     const secret = createSecretSupabaseClient();
+    const ipKey = requestClientKey();
+    const [usernameAllowed, ipAllowed] = await Promise.all([
+      authRateAllowed(secret, "reset-user", normalized, 3),
+      authRateAllowed(secret, "reset-ip", ipKey, 10),
+    ]);
+    if (!usernameAllowed || !ipAllowed) return { ok: true };
     const { data: profile } = await secret
       .from("profiles")
       .select("id")
