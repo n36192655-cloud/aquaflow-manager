@@ -152,6 +152,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          username: string | null
           phone: string | null
           tenant_id: string | null
           updated_at: string
@@ -162,6 +163,7 @@ export type Database = {
           id: string
           phone?: string | null
           tenant_id?: string | null
+          username?: string | null
           updated_at?: string
         }
         Update: {
