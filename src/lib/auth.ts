@@ -7,7 +7,6 @@ import { loginWithUsername } from "./account.functions";
 export type Role = "admin" | "reader" | "cashier";
 export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; }
 interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
-function authIdentifierForUsername(username: string): string { return `${username.trim().toLowerCase()}@mizan.local`; }
 export const useAuth = create<AuthState>()(persist((set) => ({
   user: null, loginError: null,
   login: async (username, password) => {
@@ -49,7 +48,7 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     if (!user) { set({ user: null }); return; }
     const [{ data: isSuperAdmin, error: superAdminError }, { data: profile, error: profileError }] = await Promise.all([
       supabase.rpc("is_super_admin"),
-      supabase.from("profiles").select("tenant_id, display_name").eq("id", user.id).maybeSingle(),
+      supabase.from("profiles").select("tenant_id, display_name, username").eq("id", user.id).maybeSingle(),
     ]);
     if (superAdminError) throw superAdminError;
     if (profileError) throw profileError;
@@ -62,7 +61,7 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     else if (tenantRole === "manager") role = "admin";
     else if (isSuperAdmin === true) role = "admin";
     else { set({ user: null, loginError: "bad_credentials" }); await supabase.auth.signOut(); return; }
-    set({ user: { name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم", username: normalizedUsernameFromAuthEmail(user.email), role, userId: user.id, tenantId: profile?.tenant_id ?? undefined, isSuperAdmin: isSuperAdmin === true }, loginError: null });
+    set({ user: { name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم", username: profile?.username ?? normalizedUsernameFromAuthEmail(user.email), role, userId: user.id, tenantId: profile?.tenant_id ?? undefined, isSuperAdmin: isSuperAdmin === true }, loginError: null });
   },
   heartbeat: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().touchSeat(u.seatId); },
 }), { name: "mizan-auth-v4" }));
