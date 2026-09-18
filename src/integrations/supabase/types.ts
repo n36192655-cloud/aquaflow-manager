@@ -172,6 +172,7 @@ export type Database = {
           id?: string
           phone?: string | null
           tenant_id?: string | null
+          username?: string | null
           updated_at?: string
         }
         Relationships: [
