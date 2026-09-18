@@ -57,7 +57,6 @@ export const loginWithUsername = createServerFn({ method: "POST" })
 export const provisionTenantUsers = createServerFn({ method: "POST" })
   .validator(z.object({
     tenantId: z.string().uuid(),
-    tenantName: z.string().min(1).max(160),
   }))
   .handler(async ({ data }) => {
     const accessToken = getRequestHeader("authorization")?.replace(/^Bearer\s+/i, "").trim();
@@ -91,7 +90,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
           .limit(1);
         if (existing && existing.length > 0) continue;
 
-        let username = generateUsername(data.tenantName, item.role);
+        let username = generateUsername(tenant.name, item.role);
         for (let attempt = 0; attempt < 5; attempt += 1) {
           const { data: conflict } = await admin
             .from("profiles")
@@ -99,7 +98,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
             .eq("username", username)
             .maybeSingle();
           if (!conflict) break;
-          username = generateUsername(data.tenantName, item.role);
+          username = generateUsername(tenant.name, item.role);
         }
 
         const password = generateInitialPassword();
