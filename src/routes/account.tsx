@@ -34,7 +34,7 @@ function AccountPage() {
 
   async function submit() {
     if (!currentPassword) return toast.error("أدخل كلمة المرور الحالية للتحقق من هويتك");
-    if (password.length < 8) return toast.error("كلمة المرور يجب أن تكون 12 حرفاً على الأقل");
+    if (password.length < 12) return toast.error("كلمة المرور يجب أن تكون 12 حرفاً على الأقل");
     if (password !== confirm) return toast.error("تأكيد كلمة المرور غير مطابق");
     setBusy(true);
     try {
