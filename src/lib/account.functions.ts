@@ -21,7 +21,6 @@ const CredentialsSchema = z.object({
 
 const AUTH_FAILURE_DELAY_MS = 250;
 
-
 async function opaqueRateKey(kind: string, value: string): Promise<string> {
   const input = new TextEncoder().encode(`mizan-auth-rate-v1:${kind}:${value}`);
   const digest = await crypto.subtle.digest("SHA-256", input);
@@ -48,7 +47,8 @@ function requestClientKey(): string {
   const vercelForwarded = getRequestHeader("x-vercel-forwarded-for")?.split(",")[0]?.trim();
   return vercelForwarded || forwarded || "unknown";
 }
-\nasync function authFailure(): Promise<never> {
+
+async function authFailure(): Promise<never> {
   await new Promise((resolve) => setTimeout(resolve, AUTH_FAILURE_DELAY_MS));
   throw new Error("bad_credentials");
 }
@@ -197,7 +197,6 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       .eq("username", normalized)
       .maybeSingle();
 
-    // Keep the response generic and avoid using the caller-controlled Origin as a password-reset destination.
     if (profile?.id) {
       const { data: authUser } = await secret.auth.admin.getUserById(profile.id);
       const email = authUser.user?.email ?? "";
