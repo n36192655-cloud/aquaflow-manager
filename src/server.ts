@@ -46,7 +46,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
-  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  if (response.url.startsWith("https://")) {\n    headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");\n  }
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self)");
