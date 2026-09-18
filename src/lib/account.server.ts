@@ -23,7 +23,8 @@ export function createUserSupabaseClient(accessToken: string): DbClient {
 }
 
 export function createPublicSupabaseClient(): DbClient {
-  return createClient<Database>(env("SUPABASE_URL"), env("SUPABASE_PUBLISHABLE_KEY"), {
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env("SUPABASE_PUBLISHABLE_KEY");
+  return createClient<Database>(env("SUPABASE_URL"), publishableKey, {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
   });
 }
