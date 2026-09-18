@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useLicense, type LicenseStatus } from "./license";
 import { supabase } from "./supabase";
+import { loginWithUsername } from "./account.functions";
 
 export type Role = "admin" | "reader" | "cashier";
 export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; }
@@ -13,8 +14,13 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     const normalizedUsername = username.trim().toLowerCase();
     if (!normalizedUsername || !password) { set({ loginError: "bad_credentials" }); return false; }
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: authIdentifierForUsername(normalizedUsername), password });
-      if (error || !data.user) { set({ loginError: "bad_credentials" }); return false; }
+      const authResult = await loginWithUsername({ data: { username: normalizedUsername, password } }).catch(() => null);
+      if (!authResult?.access_token || !authResult.refresh_token) { set({ loginError: "bad_credentials" }); return false; }
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: authResult.access_token,
+        refresh_token: authResult.refresh_token,
+      });
+      if (sessionError) { set({ loginError: "bad_credentials" }); return false; }
       await useAuth.getState().hydrateFromSupabase();
       const u = useAuth.getState().user;
       if (!u) { set({ loginError: "bad_credentials" }); return false; }
@@ -32,7 +38,7 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     } catch (error) { console.error("[Mizan] authentication failed", error); set({ loginError: "not_configured" }); return false; }
   },
   changePassword: async (currentPassword, newPassword) => {
-    if (!currentPassword || newPassword.length < 8) return false;
+    if (!currentPassword || newPassword.length < 12) return false;
     const { error } = await supabase.auth.updateUser({ current_password: currentPassword, password: newPassword });
     return !error;
   },
