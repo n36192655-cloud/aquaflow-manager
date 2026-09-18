@@ -30,7 +30,10 @@ export const useLicense = create<LicenseState>()(persist((set, get) => ({
     const s = get(); const status = get().validate(); if (status !== "active") return { ok: false, reason: status };
     const fp = computeFingerprint(); const existing = s.seats.find((x) => x.device === fp);
     if (existing) { set({ seats: s.seats.map((x) => x.id === existing.id ? { ...x, lastSeen: new Date().toISOString() } : x) }); return { ok: true, seatId: existing.id }; }
-    // Device fingerprints and browser storage are attacker-controlled. They must never\n    // enforce authorization or licensing limits. The server/RLS remains the security\n    // boundary; this local list is telemetry/UI state only.\n
+    // Device fingerprints and browser storage are attacker-controlled. They must never
+    // enforce authorization or licensing limits. The server/RLS remains the security
+    // boundary; this local list is telemetry/UI state only.
+
     const now = new Date().toISOString(); const seat: Seat = { id: `seat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, user, role, device: fp, since: now, lastSeen: now };
     set({ seats: [...s.seats, seat] }); return { ok: true, seatId: seat.id };
   },
