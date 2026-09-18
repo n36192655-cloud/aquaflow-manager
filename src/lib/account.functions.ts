@@ -152,7 +152,7 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       .eq("username", normalized)
       .maybeSingle();
 
-    // Always return the same result to avoid account enumeration.
+    // Keep the response generic and add a small constant delay to reduce username enumeration via timing.
     if (profile?.id) {
       const { data: authUser } = await secret.auth.admin.getUserById(profile.id);
       const email = authUser.user?.email ?? "";
@@ -165,5 +165,6 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       }
     }
 
+    await new Promise((resolve) => setTimeout(resolve, 250));
     return { ok: true };
   });
