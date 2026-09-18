@@ -3,6 +3,7 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   createPublicSupabaseClient,
+  createSecretSupabaseClient,
   generateInitialPassword,
   generateUsername,
   requireSuperAdmin,
@@ -153,20 +154,5 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
   });
 
 function requireSecretForLookup() {
-  return requireSuperAdminSecretClient();
-}
-
-function requireSuperAdminSecretClient() {
-  // Kept in a dedicated server-only module boundary by the .server helper.
-  // This function is intentionally small so no secret is ever returned to the client.
-  return (awaitableSecretClient());
-}
-
-function awaitableSecretClient() {
-  return createSecretClient();
-}
-
-function createSecretClient() {
-  const { createSecretSupabaseClient } = require("./account.server");
   return createSecretSupabaseClient();
 }
