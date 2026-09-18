@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ function AccountPage() {
   const [email, setEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
 
-  useState(() => { void supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? "")); });
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? "")); }, []);
 
   async function updateRecoveryEmail() {
     const next = email.trim().toLowerCase();
