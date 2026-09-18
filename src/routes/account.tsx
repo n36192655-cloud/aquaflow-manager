@@ -11,12 +11,14 @@ export const Route = createFileRoute("/account")({ head: () => ({ meta: [{ title
 
 function AccountPage() {
   const { user, changePassword } = useAuth();
-  const [currentPassword, setCurrentPassword] = useState("");\n  const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    if (!currentPassword) return toast.error("أدخل كلمة المرور الحالية للتحقق من هويتك");\n    if (password.length < 8) return toast.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
+    if (!currentPassword) return toast.error("أدخل كلمة المرور الحالية للتحقق من هويتك");
+    if (password.length < 8) return toast.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
     if (password !== confirm) return toast.error("تأكيد كلمة المرور غير مطابق");
     setBusy(true);
     try {
