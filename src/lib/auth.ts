@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 
 export type Role = "admin" | "reader" | "cashier";
 export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; }
-interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; changePassword: (newPassword: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
+interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
 function authIdentifierForUsername(username: string): string { return `${username.trim().toLowerCase()}@mizan.local`; }
 export const useAuth = create<AuthState>()(persist((set) => ({
   user: null, loginError: null,
@@ -31,8 +31,8 @@ export const useAuth = create<AuthState>()(persist((set) => ({
       return true;
     } catch (error) { console.error("[Mizan] authentication failed", error); set({ loginError: "not_configured" }); return false; }
   },
-  changePassword: async (newPassword) => { if (newPassword.length < 8) return false; const { error } = await supabase.auth.updateUser({ password: newPassword }); return !error; },
-  logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut(); set({ user: null, loginError: null }); },
+  changePassword: async (currentPassword, newPassword) => {\n    if (!currentPassword || newPassword.length < 8) return false;\n    const { error } = await supabase.auth.updateUser({ current_password: currentPassword, password: newPassword });\n    return !error;\n  },
+  logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut({ scope: "local" }); set({ user: null, loginError: null }); },
   hydrateFromSupabase: async () => {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
