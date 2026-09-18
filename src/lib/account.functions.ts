@@ -19,6 +19,13 @@ const CredentialsSchema = z.object({
   recoveryEmailConfigured: z.boolean(),
 });
 
+const AUTH_FAILURE_DELAY_MS = 250;
+
+async function authFailure(): Promise<never> {
+  await new Promise((resolve) => setTimeout(resolve, AUTH_FAILURE_DELAY_MS));
+  throw new Error("bad_credentials");
+}
+
 export const loginWithUsername = createServerFn({ method: "POST" })
   .validator(z.object({
     username: z.string().trim().min(1).max(80),
@@ -32,17 +39,17 @@ export const loginWithUsername = createServerFn({ method: "POST" })
       .select("id")
       .eq("username", normalized)
       .maybeSingle();
-    if (profileError || !profile) throw new Error("bad_credentials");
+    if (profileError || !profile) return authFailure();
 
     const { data: authUser, error: authUserError } = await secret.auth.admin.getUserById(profile.id);
-    if (authUserError || !authUser.user?.email) throw new Error("bad_credentials");
+    if (authUserError || !authUser.user?.email) return authFailure();
 
     const publicClient = createPublicSupabaseClient();
     const { data: authData, error: signInError } = await publicClient.auth.signInWithPassword({
       email: authUser.user.email,
       password: data.password,
     });
-    if (signInError || !authData.session || !authData.user) throw new Error("bad_credentials");
+    if (signInError || !authData.session || !authData.user) return authFailure();
 
     return {
       access_token: authData.session.access_token,
@@ -151,19 +158,24 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       .eq("username", normalized)
       .maybeSingle();
 
-    // Keep the response generic and add a small constant delay to reduce username enumeration via timing.
+    // Keep the response generic and avoid using the caller-controlled Origin as a password-reset destination.
     if (profile?.id) {
       const { data: authUser } = await secret.auth.admin.getUserById(profile.id);
       const email = authUser.user?.email ?? "";
       if (email && !email.endsWith("@mizan.local")) {
-        const publicClient = createPublicSupabaseClient();
-        const origin = getRequestHeader("origin") || process.env.APP_ORIGIN || "http://localhost:3000";
-        await publicClient.auth.resetPasswordForEmail(email, {
-          redirectTo: new URL("/update-password", origin).toString(),
-        });
+        const appOrigin =
+          process.env.APP_ORIGIN ??
+          (process.env.NODE_ENV === "production" ? "" : "http://localhost:3000");
+
+        if (appOrigin) {
+          const publicClient = createPublicSupabaseClient();
+          await publicClient.auth.resetPasswordForEmail(email, {
+            redirectTo: new URL("/update-password", appOrigin).toString(),
+          });
+        }
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, AUTH_FAILURE_DELAY_MS));
     return { ok: true };
   });
