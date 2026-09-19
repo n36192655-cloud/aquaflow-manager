@@ -91,22 +91,40 @@ CREATE POLICY water_tariff_tiers_manage ON public.water_tariff_tiers
 REVOKE ALL ON TABLE public.water_tariff_plans FROM anon;
 REVOKE ALL ON TABLE public.water_tariff_tiers FROM anon;
 
--- Keep the existing four-argument API intact and add a production-safe
--- five-argument creation path that records household size atomically.
+-- PostgreSQL requires every parameter after a defaulted parameter to
+-- have a default too. Keep the legacy four-argument call compatible while
+-- making household size mandatory on the production five-argument path.
 DROP FUNCTION IF EXISTS public.create_customer(TEXT,TEXT,TEXT,TEXT);
+DROP FUNCTION IF EXISTS public.create_customer(TEXT,TEXT,TEXT,TEXT,INTEGER);
 
 CREATE FUNCTION public.create_customer(
   p_name TEXT,
   p_phone TEXT DEFAULT NULL,
   p_address TEXT DEFAULT NULL,
-  p_pay_account TEXT DEFAULT NULL,
+  p_pay_account TEXT DEFAULT NULL
+)
+RETURNS public.customers
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+BEGIN
+  RETURN public.create_customer(p_name, p_phone, p_address, p_pay_account, 1);
+END;
+$;
+
+CREATE FUNCTION public.create_customer(
+  p_name TEXT,
+  p_phone TEXT,
+  p_address TEXT,
+  p_pay_account TEXT,
   p_household_size INTEGER
 )
 RETURNS public.customers
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 DECLARE
   v_tenant_id UUID := public.current_tenant_id();
   v_customer public.customers;
@@ -132,9 +150,11 @@ BEGIN
 
   RETURN v_customer;
 END;
-$$;
+$;
 
+REVOKE ALL ON FUNCTION public.create_customer(TEXT,TEXT,TEXT,TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.create_customer(TEXT,TEXT,TEXT,TEXT,INTEGER) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_customer(TEXT,TEXT,TEXT,TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_customer(TEXT,TEXT,TEXT,TEXT,INTEGER) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.simulate_household_water_use(
