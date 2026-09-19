@@ -14,21 +14,37 @@ export interface FieldReadingInput {
   accuracy?: number;
 }
 
+const MAX_METER_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_METER_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 function dataUrlToBlob(dataUrl: string): Blob {
-  const [meta, body] = dataUrl.split(",");
-  if (!meta || !body) throw new Error("Invalid image data");
-  const bytes = atob(body);
+  if (!dataUrl.startsWith("data:")) throw new Error("Invalid image data");
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) throw new Error("Invalid image data");
+  const meta = dataUrl.slice(0, comma);
+  const body = dataUrl.slice(comma + 1);
+  const mime = meta.match(/^data:([^;,]+)(?:;[^,]*)?$/i)?.[1]?.toLowerCase();
+  if (!mime || !ALLOWED_METER_IMAGE_TYPES.has(mime)) throw new Error("Unsupported meter image type");
+  if (!body || body.length > Math.ceil((MAX_METER_IMAGE_BYTES * 4) / 3) + 1024) throw new Error("Meter image is too large");
+  let bytes: string;
+  try {
+    bytes = atob(body);
+  } catch {
+    throw new Error("Invalid image encoding");
+  }
   const arr = new Uint8Array(bytes.length);
   for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
-  return new Blob([arr], { type: meta.match(/data:([^;]+)/)?.[1] ?? "image/jpeg" });
+  if (arr.byteLength === 0 || arr.byteLength > MAX_METER_IMAGE_BYTES) throw new Error("Meter image is too large");
+  return new Blob([arr], { type: mime });
 }
 
 export async function uploadMeterReadingImage(dataUrl: string, tenantId: string, userId: string, clientId: string): Promise<string> {
   const blob = dataUrlToBlob(dataUrl);
   const path = `${tenantId}/${userId}/${clientId}.jpg`;
   const { error } = await supabase.storage.from("meter-readings").upload(path, blob, {
-    contentType: blob.type || "image/jpeg",
+    contentType: blob.type,
     upsert: false,
+    cacheControl: "3600",
   });
   if (error && !/already exists/i.test(error.message)) throw error;
   return path;
