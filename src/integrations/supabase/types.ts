@@ -174,7 +174,6 @@ export type Database = {
           phone: string | null
           tenant_id: string | null
           updated_at: string
-          username: string | null
         }
         Insert: {
           created_at?: string
@@ -465,7 +464,6 @@ export type Database = {
           },
         ]
       }
-    }
       meter_profiles: {
         Row: { id: string; tenant_id: string; name: string; display_type: string; integer_digits: number; decimal_digits: number; register_order: string; color_semantics: Json; unit: string; created_at: string; updated_at: string }
         Insert: { id?: string; tenant_id: string; name: string; display_type: string; integer_digits?: number; decimal_digits?: number; register_order?: string; color_semantics?: Json; unit?: string; created_at?: string; updated_at?: string }
@@ -508,6 +506,7 @@ export type Database = {
         Update: { rate_key_hash?: string; window_started_at?: string; hit_count?: number; updated_at?: string }
         Relationships: []
       }
+    }
     Views: {
       [_ in never]: never
     }
