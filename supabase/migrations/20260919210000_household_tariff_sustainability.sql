@@ -111,7 +111,7 @@ DECLARE
   v_tenant_id UUID := public.current_tenant_id();
   v_customer public.customers;
 BEGIN
-  IF v_tenant_id IS NULL OR NOT public.has_tenant_role('manager', v_tenant_id) THEN
+  IF v_tenant_id IS NULL OR NOT public.has_tenant_role(v_tenant_id, 'manager'::public.app_role) THEN
     RAISE EXCEPTION 'Manager permission required';
   END IF;
   IF length(trim(COALESCE(p_name, ''))) < 2 OR length(trim(p_name)) > 200 THEN
