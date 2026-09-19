@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { fmtYER } from "@/lib/pricing";
+import { CentralDashboard } from "@/components/CentralDashboard";
 
 export const Route = createFileRoute("/")({ head: () => ({ meta: [{ title: "لوحة الاستدامة — ميزان" }] }), component: Dashboard });
 
@@ -92,7 +93,9 @@ function Dashboard() {
   const refresh = useCallback(async () => { setRefreshing(true); try { setError(null); setM(await loadMetrics()); } catch (e) { console.error(e); setError("تعذر تحميل مؤشرات لوحة الاستدامة من قاعدة البيانات."); } finally { setLoading(false); setRefreshing(false); } }, []);
   useEffect(() => { void refresh(); const c = supabase.channel("mizan-dashboard").on("postgres_changes", { event: "*", schema: "public", table: "water_readings" }, () => void refresh()).on("postgres_changes", { event: "*", schema: "public", table: "water_bills" }, () => void refresh()).on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => void refresh()).on("postgres_changes", { event: "*", schema: "public", table: "water_production_logs" }, () => void refresh()).subscribe((s) => setLive(s === "SUBSCRIBED")); return () => { void supabase.removeChannel(c); }; }, [refresh]);
   const period = useMemo(() => m.windowStart ? `${new Intl.DateTimeFormat("ar-YE", { day: "numeric", month: "long" }).format(new Date(m.windowStart))} — ${new Intl.DateTimeFormat("ar-YE", { day: "numeric", month: "long", year: "numeric" }).format(new Date(m.windowEnd))}` : "آخر 30 يوماً");
-  if (!user?.tenantId || user.isSuperAdmin) return <div dir="rtl"><Card><CardContent className="p-8 text-center"><ShieldAlert className="mx-auto h-10 w-10"/><h1 className="mt-4 font-bold">لا يوجد مشروع مرتبط بالحساب</h1><p className="mt-2 text-sm text-muted-foreground">لا يتم عرض بيانات مشاريع أخرى أو بيانات اصطناعية.</p></CardContent></Card></div>;
+  if (user?.isSuperAdmin) return <div dir="rtl"><Card><CardContent className="p-8 text-center"><ShieldAlert className="mx-auto h-10 w-10"/><h1 className="mt-4 font-bold">الإشراف المركزي</h1><p className="mt-2 text-sm text-muted-foreground">استخدم لوحة الإشراف المركزي لإدارة المشاريع.</p></CardContent></Card></div>;
+  if (!user?.tenantId) return <div dir="rtl"><Card><CardContent className="p-8 text-center"><ShieldAlert className="mx-auto h-10 w-10"/><h1 className="mt-4 font-bold">لا يوجد مشروع مرتبط بالحساب</h1><p className="mt-2 text-sm text-muted-foreground">لا يتم عرض بيانات مشاريع أخرى أو بيانات اصطناعية.</p></CardContent></Card></div>;
+  if (m.tenantName === "__CENTRAL__") return <CentralDashboard />;
   const cards = [
     ["كفاءة استخدام المياه", pct(m.waterEfficiency), "الاستهلاك المعتمد ÷ الإنتاج/مدخل النظام المعتمد × 100", <Droplets className="h-5 w-5" />],
     ["فجوة الرصيد المائي المقاسة", pct(m.meteredBalanceGap), "مدخل النظام − الاستهلاك المعتمد؛ ليست NRW معتمدة ما لم تتوفر مكونات الاستهلاك المصرح به والخسائر الظاهرية والحقيقية", <TrendingDown className="h-5 w-5" />],
