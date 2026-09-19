@@ -23,7 +23,7 @@ function LoginPage() {
 
   useEffect(() => { setMounted(true); }, []);
   const licStatus = mounted ? lic.validate() : "active";
-  useEffect(() => { if (user) navigate({ to: user.isSuperAdmin ? "/super-admin" : defaultRouteFor(user.role), replace: true }); }, [user, navigate]);
+  useEffect(() => { if (user) navigate({ to: user.mustChangePassword ? "/account" : (user.isSuperAdmin ? "/super-admin" : defaultRouteFor(user.role)), replace: true }); }, [user, navigate]);
 
   async function submit() {
     setBusy(true);
@@ -39,7 +39,7 @@ function LoginPage() {
         return;
       }
       const u = useAuth.getState().user;
-      if (u) { toast.success(`مرحباً ${u.name} — ${ROLE_LABEL[u.role]}`); navigate({ to: u.isSuperAdmin ? "/super-admin" : defaultRouteFor(u.role), replace: true }); }
+      if (u) { toast.success(`مرحباً ${u.name} — ${ROLE_LABEL[u.role]}`); navigate({ to: u.mustChangePassword ? "/account" : (u.isSuperAdmin ? "/super-admin" : defaultRouteFor(u.role)), replace: true }); }
     } finally { setBusy(false); }
   }
 
