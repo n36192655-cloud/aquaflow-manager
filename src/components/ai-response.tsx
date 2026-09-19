@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { AiResponse } from "@/lib/ai-intent";
 import { fmtYER, fmtNum } from "@/lib/pricing";
-import { AlertTriangle, CheckCircle2, XCircle, Droplets, Zap, TrendingUp, Wallet, Smartphone, CircleDollarSign, User, Phone, MapPin, Download } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle, Droplets, TrendingUp, Wallet, Smartphone, CircleDollarSign, User, Phone, MapPin, Download } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
 
 interface Props {
@@ -74,15 +74,13 @@ export function AiResponseRenderer({ response, onSuggestion }: Props) {
   if (response.kind === "loss_analysis") {
     const chart = [
       { name: "مياه", produced: response.water.produced, consumed: response.water.consumed, loss: response.water.loss },
-      { name: "كهرباء", produced: response.electric.produced, consumed: response.electric.consumed, loss: response.electric.loss },
     ];
     return (
       <Card>
         <CardContent className="p-4 space-y-3">
           <div className="text-xs text-muted-foreground">الفترة: {response.range.from} → {response.range.to}</div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2">
             <LossCard label="فاقد المياه" pct={response.water.pct} loss={response.water.loss} icon={<Droplets className="w-4 h-4 text-water" />} />
-            <LossCard label="فاقد الكهرباء" pct={response.electric.pct} loss={response.electric.loss} icon={<Zap className="w-4 h-4 text-electric" />} />
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
@@ -206,13 +204,13 @@ function StatBox({ label, value, tone, icon }: { label: string; value: string; t
   );
 }
 
-function LossCard({ label, pct, loss, icon }: { label: string; pct: number; loss: number; icon: React.ReactNode }) {
-  const danger = pct > 15;
+function LossCard({ label, pct, loss, icon }: { label: string; pct: number | null; loss: number; icon: React.ReactNode }) {
+  const danger = pct != null && pct > 15;
   return (
     <div className={`p-3 rounded-lg border ${danger ? "border-destructive/40 bg-destructive/5" : "bg-muted/30"}`}>
       <div className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</div>
-      <div className={`text-xl font-bold mt-1 ${danger ? "text-destructive" : ""}`}>{pct.toFixed(1)}%</div>
-      <div className="text-[11px] text-muted-foreground">{fmtNum(loss)} وحدة فاقد</div>
+      <div className={`text-xl font-bold mt-1 ${danger ? "text-destructive" : ""}`}>{pct == null ? "غير متاح" : `${pct.toFixed(1)}%`}</div>
+      <div className="text-[11px] text-muted-foreground">{fmtNum(loss)} م³ فرق حسابي</div>
     </div>
   );
 }
