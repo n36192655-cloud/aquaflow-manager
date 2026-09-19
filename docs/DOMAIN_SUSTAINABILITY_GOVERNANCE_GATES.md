@@ -55,3 +55,32 @@ For every production-bound change:
 7. documentation of any unresolved evidence gap.
 
 No claim of perfect security, efficiency, or availability is made without evidence. The target is continuous, measurable hardening with zero intentional reliance on guesses.
+
+
+## 5. Household consumption and tariff gate
+
+- Household size is a required production input for domestic-customer tariff and per-capita indicators.
+- WHO service-level references are used as health/service benchmarks, not represented as a legal maximum or a WHO-mandated price.
+- The production billing formula is database-owned; browser calculations are explanatory only.
+- Tariff tiers are progressive and normalized by litres/person/day so household size changes the consumption threshold rather than unfairly applying the same household volume threshold to every family.
+- A bill is rejected when the project has no active tariff instead of silently issuing a zero-value or guessed bill.
+- Tariff configuration changes are tenant-scoped and manager-authorized.
+- Consumption classification must distinguish low use from successful conservation: low consumption can indicate unreliable access or a reading problem and therefore requires verification.
+- A household example of 10 people consuming 10 m³ in a 30-day month is 33.3 L/person/day; it is inside the 20–50 L/person/day reference band and must not be mislabeled as excessive use.
+- Dashboard monthly indicators use approved/verified data only and retain unavailable states when required source data is missing.
+
+## 6. Sustainability dashboard gate
+
+The project dashboard should expose, with a consistent monthly window:
+- system input / approved production,
+- approved customer consumption,
+- water-use efficiency,
+- NRW by volume and percentage,
+- collection rate based on approved payments,
+- operational reading approval rate,
+- represented population and average litres/person/day,
+- workflow backlog (pending/rejected),
+- data-quality warnings,
+- month-over-month trend for water and financial indicators.
+
+NRW follows the water-balance concept: system input less authorized consumption, with the distinction between apparent and real losses documented separately when the required source data exists. The dashboard must not label the entire difference as physical leakage when apparent/unbilled components have not been measured.
