@@ -78,6 +78,7 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          household_size?: number
         }
         Update: {
           address?: string | null
