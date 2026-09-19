@@ -51,16 +51,32 @@ function SuperAdminDashboard() {
   }
 
   async function createCentral() {
-    const { error } = await supabase.rpc("create_central_tenant", { _name: centralName.trim() });
-    if (error) { toast.error(error.message.includes("already exists") ? "يوجد مستأجر مركزي بالفعل" : "تعذّر إنشاء المستأجر المركزي"); return; }
-    toast.success("تم إنشاء المستأجر المركزي"); await refresh();
+    const { data: tenantId, error } = await supabase.rpc("create_central_tenant", { _name: centralName.trim() });
+    if (error || !tenantId) { toast.error(error?.message?.includes("already exists") ? "يوجد مستأجر مركزي بالفعل" : "تعذّر إنشاء المستأجر المركزي"); return; }
+    toast.success("تم إنشاء المستأجر المركزي");
+    await refresh();
+    try {
+      const result = await provisionTenantUsers({ data: { tenantId } });
+      setCredentialSets((prev) => ({ ...prev, [tenantId]: result.credentials }));
+      if (result.credentials.length === 3) toast.success("تم إنشاء حسابات المدير والمحصل وقارئ العدادات للمستأجر المركزي");
+    } catch {
+      toast.error("تم إنشاء المستأجر المركزي، لكن تعذر إنشاء الحسابات الثلاثة تلقائياً");
+    }
   }
 
   async function createProject() {
     if (!name.trim()) return;
-    const { error } = await supabase.rpc("create_project_tenant", { _name: name.trim() });
-    if (error) { toast.error("تعذّر إنشاء مشروع المياه"); return; }
-    setName(""); toast.success("تم إنشاء مشروع المياه وربطه بالإشراف المركزي"); await refresh();
+    const { data: tenantId, error } = await supabase.rpc("create_project_tenant", { _name: name.trim() });
+    if (error || !tenantId) { toast.error("تعذّر إنشاء مشروع المياه"); return; }
+    setName(""); toast.success("تم إنشاء مشروع المياه وربطه بالإشراف المركزي");
+    await refresh();
+    try {
+      const result = await provisionTenantUsers({ data: { tenantId } });
+      setCredentialSets((prev) => ({ ...prev, [tenantId]: result.credentials }));
+      if (result.credentials.length === 3) toast.success("تم إنشاء الحسابات الثلاثة للمشروع");
+    } catch {
+      toast.error("تم إنشاء المشروع، لكن تعذر إنشاء الحسابات الثلاثة تلقائياً");
+    }
   }
 
   async function provisionUsers(t: TenantRow) {
@@ -96,7 +112,7 @@ function SuperAdminDashboard() {
       </header>
 
       <Card className="border-primary/20"><CardHeader><CardTitle className="flex items-center gap-2"><Network className="w-5 h-5" /> الهيكل المركزي</CardTitle></CardHeader><CardContent>
-        {central ? <div className="rounded-lg border p-4"><div className="font-bold">{central.name}</div><div className="text-xs text-muted-foreground mt-1">مستأجر مركزي للإشراف</div><div className="mt-3 grid gap-2">{projects.map((p) => <div key={p.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2"><span className="font-medium">↳ {p.name}</span><Badge>{p.subscription_status === "active" ? "نشط" : p.subscription_status === "suspended" ? "موقوف" : "منتهي"}</Badge></div>)}{projects.length === 0 && <div className="text-sm text-muted-foreground">لا توجد مشاريع مرتبطة بعد.</div>}</div></div> : <div className="space-y-3"><p className="text-sm text-muted-foreground">لم يُنشأ المستأجر المركزي بعد.</p><div className="flex gap-2"><Input value={centralName} onChange={(e) => setCentralName(e.target.value)} /><Button onClick={() => void createCentral()}><Plus className="w-4 h-4 ml-1" /> إنشاء مركزي</Button></div></div>}
+        {central ? <div className="rounded-lg border p-4"><div className="font-bold">{central.name}</div><div className="text-xs text-muted-foreground mt-1">مستأجر مركزي للإشراف</div><div className="mt-3"><Button size="sm" variant="outline" disabled={provisioningTenantId === central.id} onClick={() => void provisionUsers(central)}>{provisioningTenantId === central.id ? "جارٍ إنشاء الحسابات…" : "إعادة إنشاء الحسابات الناقصة"}</Button></div><div className="mt-3 grid gap-2">{projects.map((p) => <div key={p.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2"><span className="font-medium">↳ {p.name}</span><Badge>{p.subscription_status === "active" ? "نشط" : p.subscription_status === "suspended" ? "موقوف" : "منتهي"}</Badge></div>)}{projects.length === 0 && <div className="text-sm text-muted-foreground">لا توجد مشاريع مرتبطة بعد.</div>}</div></div> : <div className="space-y-3"><p className="text-sm text-muted-foreground">لم يُنشأ المستأجر المركزي بعد.</p><div className="flex gap-2"><Input value={centralName} onChange={(e) => setCentralName(e.target.value)} /><Button onClick={() => void createCentral()}><Plus className="w-4 h-4 ml-1" /> إنشاء مركزي</Button></div></div>}
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>إنشاء مشروع مياه</CardTitle></CardHeader><CardContent className="flex gap-2"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: مشروع مياه المعافر" /><Button onClick={() => void createProject()} disabled={!central || !name.trim()}>إنشاء وربط</Button></CardContent></Card>
