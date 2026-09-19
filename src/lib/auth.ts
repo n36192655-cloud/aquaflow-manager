@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 import { loginWithUsername } from "./account.functions";
 
 export type Role = "admin" | "reader" | "cashier";
-export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; }
+export interface AuthUser { name: string; username?: string; role: Role; seatId?: string; userId?: string; tenantId?: string; isSuperAdmin?: boolean; mustChangePassword?: boolean; }
 interface AuthState { user: AuthUser | null; loginError: LicenseStatus | "bad_credentials" | "not_configured" | null; login: (username: string, password: string) => Promise<boolean>; changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>; logout: () => void; heartbeat: () => void; hydrateFromSupabase: () => Promise<void>; }
 export const useAuth = create<AuthState>()(persist((set) => ({
   user: null, loginError: null,
@@ -52,8 +52,11 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     });
     if (reauthError || !reauthData.session) return false;
 
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword, current_password: currentPassword });
     if (updateError) return false;
+
+    const { error: passwordSetupError } = await supabase.rpc("complete_initial_password_change");
+    if (passwordSetupError) return false;
 
     // A password change is a credential-security event: revoke refresh-token
     // sessions on every device and force a fresh login.
@@ -76,14 +79,14 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     if (profileError) throw profileError;
     const { data: roles, error: roleError } = await supabase.from("user_roles").select("role, tenant_id").eq("user_id", user.id);
     if (roleError) throw roleError;
-    const tenantRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === profile?.tenant_id)?.role;
+    const tenantRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === profile?.tenant_id);
     let role: Role;
-    if (tenantRole === "reader") role = "reader";
-    else if (tenantRole === "collector") role = "cashier";
-    else if (tenantRole === "manager") role = "admin";
+    if (tenantRole?.role === "reader") role = "reader";
+    else if (tenantRole?.role === "collector") role = "cashier";
+    else if (tenantRole?.role === "manager") role = "admin";
     else if (isSuperAdmin === true) role = "admin";
     else { set({ user: null, loginError: "bad_credentials" }); await supabase.auth.signOut(); return; }
-    set({ user: { name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم", username: profile?.username ?? normalizedUsernameFromAuthEmail(user.email), role, userId: user.id, tenantId: profile?.tenant_id ?? undefined, isSuperAdmin: isSuperAdmin === true }, loginError: null });
+    set({ user: { name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم", username: profile?.username ?? normalizedUsernameFromAuthEmail(user.email), role, userId: user.id, tenantId: profile?.tenant_id ?? undefined, isSuperAdmin: isSuperAdmin === true, mustChangePassword: tenantRole?.must_change_password === true }, loginError: null });
   },
   heartbeat: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().touchSeat(u.seatId); },
 }), { name: "mizan-auth-v4" }));
