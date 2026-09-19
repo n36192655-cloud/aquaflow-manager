@@ -67,7 +67,7 @@ export const useAuth = create<AuthState>()(persist((set) => ({
     ]);
     if (superAdminError) throw superAdminError;
     if (profileError) throw profileError;
-    const { data: roles, error: roleError } = await supabase.from("user_roles").select("role, tenant_id").eq("user_id", user.id);
+    const { data: roles, error: roleError } = await supabase.from("user_roles").select("role, tenant_id, must_change_password").eq("user_id", user.id);
     if (roleError) throw roleError;
     const tenantRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === profile?.tenant_id);
     let role: Role;
