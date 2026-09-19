@@ -84,3 +84,9 @@ The project dashboard should expose, with a consistent monthly window:
 - month-over-month trend for water and financial indicators.
 
 NRW follows the water-balance concept: system input less authorized consumption, with the distinction between apparent and real losses documented separately when the required source data exists. The dashboard must not label the entire difference as physical leakage when apparent/unbilled components have not been measured.
+
+
+## Water-balance terminology gate
+- Mizan must not label system-input minus customer-metered consumption as true non-revenue water (NRW).
+- True NRW requires authorized-consumption accounting and separation of apparent and real losses under the adopted water-audit methodology.
+- Until those source components are captured, dashboards may show a clearly named **metered balance gap** as an operational indicator, not as certified NRW.
