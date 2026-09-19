@@ -59,6 +59,11 @@ function withSecurityHeaders(response: Response, requestUrl?: string): Response 
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self)");
+  // Prevent this application from being embedded by another origin.
+  headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Origin-Agent-Cluster", "?1");
+  headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
 
   // Application HTML and JSON responses may contain tenant/authenticated data.
   // Do not let intermediary/browser caches retain those dynamic responses.
