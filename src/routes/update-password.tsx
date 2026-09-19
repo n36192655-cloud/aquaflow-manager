@@ -37,6 +37,8 @@ function UpdatePasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) return toast.error("تعذر تحديث كلمة المرور");
+      const { error: lifecycleError } = await supabase.rpc("complete_initial_password_change");
+      if (lifecycleError) return toast.error("تم تحديث كلمة المرور، لكن تعذر إكمال تهيئة الحساب. سجّل الدخول مجدداً لإعادة المحاولة.");
       await supabase.auth.signOut({ scope: "local" });
       toast.success("تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.");
       navigate({ to: "/login", replace: true });
