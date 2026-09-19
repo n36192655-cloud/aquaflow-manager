@@ -18,8 +18,6 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-// h3 swallows in-handler throws into a normal 500 Response with body
-// {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
@@ -46,12 +44,28 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
+  const contentType = headers.get("content-type") ?? "";
+
   if (response.url.startsWith("https://")) {
     headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
+
+  // Defense-in-depth response hardening aligned with OWASP Secure Headers guidance.
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("X-DNS-Prefetch-Control", "off");
+  headers.set("X-Download-Options", "noopen");
+  headers.set("X-Permitted-Cross-Domain-Policies", "none");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self)");
+
+  // Application HTML and JSON responses may contain tenant/authenticated data.
+  // Do not let intermediary/browser caches retain those dynamic responses.
+  if (contentType.includes("text/html") || contentType.includes("application/json")) {
+    headers.set("Cache-Control", "private, no-store, max-age=0");
+  }
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
