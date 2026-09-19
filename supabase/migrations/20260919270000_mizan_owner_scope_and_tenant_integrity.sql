@@ -304,7 +304,6 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.record_water_reading(UUID,NUMERIC,TEXT,TEXT,TEXT,NUMERIC,TEXT,NUMERIC,NUMERIC,NUMERIC) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.record_water_reading(UUID,NUMERIC,TEXT,TEXT,TEXT,NUMERIC,TEXT,TEXT,NUMERIC,NUMERIC,NUMERIC) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_water_reading(UUID,NUMERIC,TEXT,TEXT,TEXT,NUMERIC,TEXT,TEXT,NUMERIC,NUMERIC,NUMERIC) TO authenticated;
 
@@ -355,7 +354,7 @@ BEGIN
     FOR UPDATE;
   END IF;
 
-  IF v_customer IS NULL THEN RAI    RAISE EXCEPTION 'Reading not found'; END IF;
+  IF v_customer IS NULL THEN RAISE EXCEPTION 'Reading not found'; END IF;
   IF v_status <> 'pending' THEN RAISE EXCEPTION 'Reading is not pending'; END IF;
 
   v_charge := public.calculate_water_charge(v_tenant,v_customer,v_consumption,30,CURRENT_DATE);
