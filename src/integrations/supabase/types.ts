@@ -122,10 +122,6 @@ export type Database = {
           method?: string
           status?: string
           tenant_id: string
-          tariff_plan_id?: string | null
-          tariff_category?: string | null
-          consumption_lpd?: number | null
-          tariff_breakdown?: Json
         }
         Update: {
           amount?: number
@@ -280,6 +276,10 @@ export type Database = {
           tenant_id: string
           total?: number
         }
+          tariff_plan_id?: string | null
+          tariff_category?: string | null
+          consumption_lpd?: number | null
+          tariff_breakdown?: Json
         Update: {
           arrears?: number
           created_at?: string
