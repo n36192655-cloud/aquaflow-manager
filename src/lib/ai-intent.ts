@@ -200,7 +200,7 @@ async function paymentStatus(tenantId: string): Promise<AiResponse> {
     const balance = Math.max(0, total - paidAmount);
     const name = customers.get(bill.customer_id) ?? "—";
     if (balance <= 0 && paidAmount > 0) paid.push({ id: bill.id, name, serial: meterNumbers.get(bill.reading_id ?? "") ?? "—", total });
-    else unpaid.push({ id: bill.id, name, serial: bill.serial, total, balance });
+    else unpaid.push({ id: bill.id, name, serial: meterNumbers.get(bill.reading_id ?? "") ?? "—", total, balance });
   }
   return { kind: "payment_status", paid, unpaid };
 }
