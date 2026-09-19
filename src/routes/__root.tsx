@@ -25,17 +25,82 @@ function RootShell({ children }: { children: ReactNode }) { return <html lang="a
 function RootComponent() { const { queryClient } = Route.useRouteContext(); return <QueryClientProvider client={queryClient}><SubscriptionGuard><AppShell><Outlet /></AppShell></SubscriptionGuard><Toaster position="top-center" richColors /></QueryClientProvider>; }
 
 function SubscriptionGuard({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<"loading" | "ok" | "locked">("loading"); const [reason, setReason] = useState<"suspended" | "expired" | null>(null);
-  useEffect(() => { let alive = true; const check = async () => { try {
-    const { data: userData } = await supabase.auth.getUser(); if (!userData.user) { if (alive) setState("ok"); return; }
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userData.user.id);
-    if ((roles ?? []).some((r: { role: string }) => r.role === "super_admin")) { if (alive) setState("ok"); return; }
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userData.user.id).maybeSingle(); if (!profile?.tenant_id) { if (alive) setState("ok"); return; }
-    const { data: tenant } = await supabase.from("tenants").select("subscription_status, subscription_expires_at").eq("id", profile.tenant_id).maybeSingle(); if (!tenant) { if (alive) setState("ok"); return; }
-    const expired = tenant.subscription_expires_at && new Date(tenant.subscription_expires_at).getTime() < Date.now();
-    if (tenant.subscription_status === "suspended" || tenant.subscription_status === "expired" || expired) { if (alive) { setReason(tenant.subscription_status === "suspended" ? "suspended" : "expired"); setState("locked"); } return; }
-    if (alive) setState("ok");
-  } catch { if (alive) { setReason(null); setState("locked"); } } }; void check(); return () => { alive = false; }; }, []);
-  if (state === "loading") return null; if (state === "locked") return <SubscriptionLockScreen reason={reason} />; return <>{children}</>;
+  const [state, setState] = useState<"loading" | "ok" | "locked">("loading");
+  const [reason, setReason] = useState<"suspended" | "expired" | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!userData.user) {
+          if (alive) setState("ok");
+          return;
+        }
+
+        const { data: isSuperAdmin, error: roleError } = await supabase.rpc("is_super_admin");
+        if (roleError) throw roleError;
+        if (isSuperAdmin === true) {
+          if (alive) setState("ok");
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", userData.user.id)
+          .maybeSingle();
+        if (profileError) throw profileError;
+        if (!profile?.tenant_id) {
+          throw new Error("tenant_not_found");
+        }
+
+        const { data: tenant, error: tenantError } = await supabase
+          .from("tenants")
+          .select("subscription_status, subscription_expires_at")
+          .eq("id", profile.tenant_id)
+          .maybeSingle();
+        if (tenantError) throw tenantError;
+        if (!tenant) throw new Error("tenant_not_found");
+
+        const expired =
+          Boolean(tenant.subscription_expires_at) &&
+          new Date(tenant.subscription_expires_at as string).getTime() < Date.now();
+
+        if (
+          tenant.subscription_status === "suspended" ||
+          tenant.subscription_status === "expired" ||
+          expired
+        ) {
+          if (alive) {
+            setReason(tenant.subscription_status === "suspended" ? "suspended" : "expired");
+            setState("locked");
+          }
+          return;
+        }
+
+        if (tenant.subscription_status !== "active") {
+          throw new Error("tenant_not_active");
+        }
+
+        if (alive) setState("ok");
+      } catch {
+        if (alive) {
+          setReason(null);
+          setState("locked");
+        }
+      }
+    };
+
+    void check();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (state === "loading") return null;
+  if (state === "locked") return <SubscriptionLockScreen reason={reason} />;
+  return <>{children}</>;
 }
 function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | null }) { return <div className="min-h-screen flex items-center justify-center bg-background px-4" dir="rtl"><div className="max-w-md text-center space-y-4"><div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 grid place-items-center"><span className="text-3xl">🔒</span></div><h1 className="text-2xl font-bold">{reason === "expired" ? "انتهى الاشتراك" : reason === "suspended" ? "الاشتراك موقوف" : "تعذر التحقق من حالة الاشتراك"}</h1><p className="text-sm text-muted-foreground">{reason ? "مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي. يرجى التواصل مع مالك المنصة." : "تعذر التحقق من حالة الاشتراك بشكل آمن. أعد المحاولة بعد استقرار الاتصال."}</p><div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground">منصة ميزان لإستدامة خدمات المياه</div></div></div>; }
