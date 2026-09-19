@@ -58,6 +58,7 @@ type Profile = {
   name: string;
   integer_digits: number;
   decimal_digits: number;
+  register_order: "integer_then_decimal" | "decimal_then_integer";
   display_type: string;
   color_semantics: unknown;
 };
@@ -102,10 +103,28 @@ function normalizeSerial(value: string): string {
   return value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
 }
 
+function normalizeReadingInput(value: string): string {
+  return value.trim().replace(",", ".");
+}
+
 function decimalPlaces(value: string): number {
-  const normalized = value.trim().replace(",", ".");
+  const normalized = normalizeReadingInput(value);
   const index = normalized.indexOf(".");
   return index === -1 ? 0 : normalized.length - index - 1;
+}
+
+function validateReadingInput(value: string, profile: Profile): number | null {
+  const normalized = normalizeReadingInput(value);
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
+
+  const [integerPart, decimalPart = ""] = normalized.split(".");
+  const significantInteger = integerPart.replace(/^0+(?=\d)/, "");
+  if (profile.integer_digits > 0 && significantInteger.length > profile.integer_digits) return null;
+  if (decimalPart.length > profile.decimal_digits) return null;
+  if (profile.decimal_digits === 0 && decimalPart.length > 0) return null;
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
 }
 
 function ReadingsPage() {
@@ -149,7 +168,7 @@ function ReadingsPage() {
           .order("serial_number"),
         supabase
           .from("meter_profiles")
-          .select("id,name,integer_digits,decimal_digits,display_type,color_semantics")
+          .select("id,name,integer_digits,decimal_digits,register_order,display_type,color_semantics")
           .eq("tenant_id", user.tenantId),
         supabase
           .from("water_readings")
@@ -284,9 +303,16 @@ function ReadingsPage() {
   async function saveReading() {
     if (!user?.userId || !user.tenantId) return toast.error("جلسة المستخدم غير صالحة");
     if (!selected) return toast.error("اختر عداداً فعّالاً");
-    const numeric = Number(current);
-    if (!Number.isFinite(numeric) || numeric < 0) return toast.error("القراءة الحالية غير صالحة");
-    if (selectedProfile && decimalPlaces(current) > selectedProfile.decimal_digits)
+    if (!selectedProfile)
+      return toast.error("لا يمكن تسجيل القراءة قبل ربط مواصفة قراءة صحيحة بهذا العداد");
+
+    const numeric = validateReadingInput(current, selectedProfile);
+    if (numeric == null) {
+      return toast.error(
+        `أدخل القراءة بالأرقام فقط وفق مواصفة العداد: ${selectedProfile.integer_digits} أرقام صحيحة و${selectedProfile.decimal_digits} أرقام عشرية كحد أقصى`,
+      );
+    }
+    if (decimalPlaces(current) > selectedProfile.decimal_digits)
       return toast.error(`هذا العداد يسمح حتى ${selectedProfile.decimal_digits} منازل عشرية فقط`);
     if (ocrSerial && normalizeSerial(ocrSerial) !== normalizeSerial(selected.serial_number))
       return toast.error("رقم العداد الملتقط لا يطابق العداد المسجل");
@@ -558,13 +584,27 @@ function ReadingsPage() {
               <div>
                 <Label>القراءة الحالية</Label>
                 <Input
-                  className="mt-1"
-                  type="number"
-                  step={selectedProfile?.decimal_digits ? "0.01" : "1"}
+                  className="mt-1 font-mono"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder={
+                    selectedProfile
+                      ? selectedProfile.decimal_digits > 0
+                        ? `مثال: 123.${"0".repeat(selectedProfile.decimal_digits)}`
+                        : "مثال: 123"
+                      : "اختر عداداً"
+                  }
                   value={current}
                   onChange={(e) => setCurrent(e.target.value)}
-                  disabled={!selected}
+                  disabled={!selected || !selectedProfile}
+                  aria-describedby="meter-reading-help"
                 />
+                <div id="meter-reading-help" className="text-[11px] text-muted-foreground mt-1">
+                  {selectedProfile
+                    ? `يسمح حتى ${selectedProfile.integer_digits} أرقام صحيحة و${selectedProfile.decimal_digits} أرقام عشرية. التحقق النهائي يتم على الخادم.`
+                    : "اختر عداداً مرتبطاً بمواصفة قراءة."}
+                </div>
               </div>
               <Button size="lg" onClick={() => void saveReading()} disabled={busy || !selected}>
                 {busy ? "جاري المعالجة..." : "حفظ القراءة"}
@@ -654,6 +694,15 @@ function ReadingsPage() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleOcr}
         expectedSerial={selected?.serial_number ?? null}
+        profile={
+          selectedProfile
+            ? {
+                integerDigits: selectedProfile.integer_digits,
+                decimalDigits: selectedProfile.decimal_digits,
+                registerOrder: selectedProfile.register_order,
+              }
+            : null
+        }
       />
     </div>
   );
