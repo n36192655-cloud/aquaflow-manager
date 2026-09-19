@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user?.tenantId, user?.isSuperAdmin]);
   useEffect(() => {
     if (user?.isSuperAdmin || remoteLicenseStatus === "active") return;
-    if (pathname !== "/subscription" && pathname !== "/login" && remoteLicenseStatus && remoteLicenseStatus !== "active") navigate({ to: "/subscription", replace: true });
+    if (pathname !== "/subscription" && pathname !== "/login" && remoteLicenseStatus) navigate({ to: "/subscription", replace: true });
   }, [pathname, navigate, user?.isSuperAdmin, remoteLicenseStatus]);
   useEffect(() => {
     if (pathname === "/login") return;
