@@ -423,6 +423,10 @@ GRANT EXECUTE ON FUNCTION public.update_water_tariff_updated_at() TO service_rol
 
 
 -- Security-invoker KPI view: the caller's RLS/privileges apply to every source table.
+-- IMPORTANT: this view intentionally does NOT label the input-minus-metered-consumption
+-- gap as IWA/AWWA/WHO NRW. True NRW requires authorized consumption (including
+-- authorized unbilled use) and appropriate apparent/real-loss accounting. Until
+-- those components exist in the source model, expose this only as a metered balance gap.
 CREATE OR REPLACE VIEW public.monthly_water_service_kpis
 WITH (security_invoker = true)
 AS
@@ -491,12 +495,12 @@ SELECT m.tenant_id,
          WHEN COALESCE(pr.system_input_m3, 0) > 0
          THEN (pr.system_input_m3 - COALESCE(rd.consumption_m3, 0))::numeric
          ELSE NULL
-       END AS nrw_m3,
+       END AS metered_balance_gap_m3,
        CASE
          WHEN COALESCE(pr.system_input_m3, 0) > 0
          THEN ((pr.system_input_m3 - COALESCE(rd.consumption_m3, 0)) / pr.system_input_m3 * 100)::numeric
          ELSE NULL
-       END AS nrw_pct,
+       END AS metered_balance_gap_pct,
        CASE
          WHEN COALESCE(pr.system_input_m3, 0) > 0
          THEN (COALESCE(rd.consumption_m3, 0) / pr.system_input_m3 * 100)::numeric
