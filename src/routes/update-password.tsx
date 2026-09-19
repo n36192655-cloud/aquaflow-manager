@@ -38,7 +38,10 @@ function UpdatePasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) return toast.error("تعذر تحديث كلمة المرور");
       const { error: lifecycleError } = await supabase.rpc("complete_initial_password_change");
-      if (lifecycleError) return toast.error("تم تحديث كلمة المرور، لكن تعذر إكمال تهيئة الحساب. سجّل الدخول مجدداً لإعادة المحاولة.");
+      if (lifecycleError)
+        return toast.error(
+          "تم تحديث كلمة المرور، لكن تعذر إكمال تهيئة الحساب. سجّل الدخول مجدداً لإعادة المحاولة.",
+        );
       await supabase.auth.signOut({ scope: "local" });
       toast.success("تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.");
       navigate({ to: "/login", replace: true });
@@ -47,15 +50,43 @@ function UpdatePasswordPage() {
     }
   }
 
-  return <div className="min-h-screen grid place-items-center px-4 bg-background" dir="rtl">
-    <Card className="w-full max-w-md">
-      <CardHeader><CardTitle>تعيين كلمة مرور جديدة</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">استخدم هذه الصفحة فقط بعد فتح رابط الاستعادة من بريدك.</p>
-        <div><Label>كلمة المرور الجديدة</Label><Input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} /></div>
-        <div><Label>تأكيد كلمة المرور</Label><Input type="password" autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)} /></div>
-        <Button className="w-full" onClick={() => void submit()} disabled={busy || !password || !confirm}>{busy ? "جارٍ التحديث…" : "تحديث كلمة المرور"}</Button>
-      </CardContent>
-    </Card>
-  </div>;
+  return (
+    <div className="min-h-screen grid place-items-center px-4 bg-background" dir="rtl">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>تعيين كلمة مرور جديدة</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            استخدم هذه الصفحة فقط بعد فتح رابط الاستعادة من بريدك.
+          </p>
+          <div>
+            <Label>كلمة المرور الجديدة</Label>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>تأكيد كلمة المرور</Label>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={() => void submit()}
+            disabled={busy || !password || !confirm}
+          >
+            {busy ? "جارٍ التحديث…" : "تحديث كلمة المرور"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Camera, Loader2, ScanLine, X, ShieldAlert, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -29,8 +35,12 @@ interface Props {
   profile?: MeterProfileForOcr | null;
 }
 
-function normalize(s: string): string { return s.toUpperCase().replace(/[^A-Z0-9]/g, ""); }
-function digitCount(value: string): number { return value.replace(/\D/g, "").length; }
+function normalize(s: string): string {
+  return s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+function digitCount(value: string): number {
+  return value.replace(/\D/g, "").length;
+}
 
 function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null): number | null {
   if (!profile) return null;
@@ -51,11 +61,13 @@ function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null):
     const left = parts[0];
     const right = parts[1];
     if (profile.registerOrder === "integer_then_decimal") {
-      if ((integerDigits > 0 && left.length !== integerDigits) || right.length !== decimalDigits) return null;
+      if ((integerDigits > 0 && left.length !== integerDigits) || right.length !== decimalDigits)
+        return null;
       const n = Number(`${left}.${right}`);
       return Number.isFinite(n) ? n : null;
     }
-    if (left.length !== decimalDigits || (integerDigits > 0 && right.length !== integerDigits)) return null;
+    if (left.length !== decimalDigits || (integerDigits > 0 && right.length !== integerDigits))
+      return null;
     const n = Number(`${right}.${left}`);
     return Number.isFinite(n) ? n : null;
   }
@@ -78,7 +90,11 @@ function parseCandidate(candidate: string, profile?: MeterProfileForOcr | null):
   return Number.isFinite(n) ? n : null;
 }
 
-function parseReading(raw: string, profile?: MeterProfileForOcr | null, expectedSerial?: string | null): { reading: number | null; candidates: number } {
+function parseReading(
+  raw: string,
+  profile?: MeterProfileForOcr | null,
+  expectedSerial?: string | null,
+): { reading: number | null; candidates: number } {
   const cleaned = raw.replace(/[٬،]/g, ",").replace(/[^0-9.,]/g, " ");
   const tokens = cleaned.match(/\d+(?:[.,]\d+)?/g) ?? [];
   const expected = expectedSerial ? normalize(expectedSerial) : "";
@@ -95,11 +111,23 @@ function parseReading(raw: string, profile?: MeterProfileForOcr | null, expected
   return { reading: unique.length === 1 ? unique[0] : null, candidates: unique.length };
 }
 
-async function recognizeImage(image: HTMLCanvasElement | HTMLImageElement, profile?: MeterProfileForOcr | null, expectedSerial?: string | null): Promise<{ raw: string; reading: number | null; serial: string | null; confidence: number; candidates: number }> {
+async function recognizeImage(
+  image: HTMLCanvasElement | HTMLImageElement,
+  profile?: MeterProfileForOcr | null,
+  expectedSerial?: string | null,
+): Promise<{
+  raw: string;
+  reading: number | null;
+  serial: string | null;
+  confidence: number;
+  candidates: number;
+}> {
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("eng", 1);
   try {
-    await worker.setParameters({ tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.," });
+    await worker.setParameters({
+      tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.,",
+    });
     const { data } = await worker.recognize(image);
     const raw = (data.text || "").trim();
     const serial = raw.match(/[A-Z]{0,3}-?\d{3,10}/i)?.[0]?.toUpperCase() ?? null;
@@ -109,9 +137,12 @@ async function recognizeImage(image: HTMLCanvasElement | HTMLImageElement, profi
       reading: parsed.reading,
       serial,
       candidates: parsed.candidates,
-      confidence: typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence / 100)) : 0,
+      confidence:
+        typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence / 100)) : 0,
     };
-  } finally { await worker.terminate(); }
+  } finally {
+    await worker.terminate();
+  }
 }
 
 export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile }: Props) {
@@ -119,7 +150,9 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [resolvedProfile, setResolvedProfile] = useState<MeterProfileForOcr | null>(profile ?? null);
+  const [resolvedProfile, setResolvedProfile] = useState<MeterProfileForOcr | null>(
+    profile ?? null,
+  );
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -144,10 +177,15 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
       setResolvedProfile({
         integerDigits: Number(meterProfile.integer_digits ?? 0),
         decimalDigits: Number(meterProfile.decimal_digits ?? 0),
-        registerOrder: meterProfile.register_order === "decimal_then_integer" ? "decimal_then_integer" : "integer_then_decimal",
+        registerOrder:
+          meterProfile.register_order === "decimal_then_integer"
+            ? "decimal_then_integer"
+            : "integer_then_decimal",
       });
     })().catch((error) => console.error("Unable to resolve meter OCR profile", error));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, expectedSerial, profile]);
 
   useEffect(() => {
@@ -155,12 +193,27 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
     let cancelled = false;
     (async () => {
       try {
-        if (!navigator.mediaDevices?.getUserMedia) { toast.error("الكاميرا غير مدعومة في هذا المتصفح"); return; }
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (!navigator.mediaDevices?.getUserMedia) {
+          toast.error("الكاميرا غير مدعومة في هذا المتصفح");
+          return;
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
-        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); setReady(true); }
-      } catch { toast.error("تعذّر فتح الكاميرا. يمكنك اختيار صورة من الهاتف بدلاً منها."); }
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setReady(true);
+        }
+      } catch {
+        toast.error("تعذّر فتح الكاميرا. يمكنك اختيار صورة من الهاتف بدلاً منها.");
+      }
     })();
     return () => {
       cancelled = true;
@@ -181,7 +234,8 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
       const result = await recognizeImage(c, resolvedProfile, expectedSerial);
       setProgress(90);
       let match: OcrResult["serialMatch"] = "unknown";
-      if (expectedSerial && result.serial) match = normalize(result.serial) === normalize(expectedSerial) ? "match" : "mismatch";
+      if (expectedSerial && result.serial)
+        match = normalize(result.serial) === normalize(expectedSerial) ? "match" : "mismatch";
       onCapture({
         reading: result.reading,
         serial: result.serial,
@@ -191,9 +245,14 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
         confidence: result.confidence,
         readingCandidates: result.candidates,
       });
-      if (match === "mismatch") toast.error("رقم العداد الملتقط لا يطابق العداد المختار؛ راجع الصورة قبل الحفظ.");
-      else if (result.candidates !== 1) toast.warning("لم يتم العثور على قراءة واحدة غير ملتبسة وفق مواصفة العداد؛ أدخل القراءة يدوياً.");
-      else if (result.confidence < 0.70) toast.warning("الثقة في OCR منخفضة؛ راجع القراءة يدوياً قبل الحفظ.");
+      if (match === "mismatch")
+        toast.error("رقم العداد الملتقط لا يطابق العداد المختار؛ راجع الصورة قبل الحفظ.");
+      else if (result.candidates !== 1)
+        toast.warning(
+          "لم يتم العثور على قراءة واحدة غير ملتبسة وفق مواصفة العداد؛ أدخل القراءة يدوياً.",
+        );
+      else if (result.confidence < 0.7)
+        toast.warning("الثقة في OCR منخفضة؛ راجع القراءة يدوياً قبل الحفظ.");
     } catch (e) {
       console.error(e);
       toast.error("فشل التعرف على الصورة");
@@ -242,12 +301,69 @@ export function MeterCamera({ open, onClose, onCapture, expectedSerial, profile 
     }
   }
 
-  return <Dialog open={open} onOpenChange={(v) => !v && onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle className="flex items-center gap-2"><Camera className="w-4 h-4" /> تصوير العداد + التحقق البصري</DialogTitle></DialogHeader>
-    {expectedSerial && <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-primary" /><span>الرقم المتوقع للعداد: <span className="font-mono font-semibold" dir="ltr">{expectedSerial}</span></span></div>}
-    {resolvedProfile && <div className="text-xs bg-muted/40 border rounded-md p-2">مواصفة القراءة: {resolvedProfile.integerDigits} أرقام صحيحة + {resolvedProfile.decimalDigits} أرقام عشرية · ترتيب السجل: {resolvedProfile.registerOrder === "integer_then_decimal" ? "صحيح ثم عشري" : "عشري ثم صحيح"}</div>}
-    <div className="relative rounded-lg overflow-hidden bg-black aspect-video"><video ref={videoRef} playsInline muted className="w-full h-full object-cover" /><canvas ref={canvasRef} className="hidden" /><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-16 border-2 border-yellow-400/80 rounded-md pointer-events-none" />{busy&&<div className="absolute inset-0 grid place-items-center bg-black/60 text-white text-sm"><Loader2 className="w-6 h-6 animate-spin" /><div>جارٍ تحليل الصورة… {progress}%</div></div>}</div>
-    <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void choosePhoneImage(e.target.files?.[0])} />
-    <p className="text-xs text-muted-foreground">OCR اقتراح فقط. لا يتم اعتماد القراءة تلقائياً؛ عند الغموض أو عدم مطابقة مواصفة العداد يجب مراجعتها وإدخالها يدوياً. ألوان السجل لا تُستخدم لاستنتاج الرقم.</p>
-    <DialogFooter className="gap-2"><Button variant="outline" onClick={onClose} disabled={busy}><X className="w-4 h-4 ms-1" /> إلغاء</Button><Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}><ImagePlus className="w-4 h-4 ms-1" /> صورة من الهاتف</Button><Button onClick={() => void capture()} disabled={!ready || busy}><ScanLine className="w-4 h-4 ms-1" /> التقاط وقراءة</Button></DialogFooter>
-  </DialogContent></Dialog>;
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Camera className="w-4 h-4" /> تصوير العداد + التحقق البصري
+          </DialogTitle>
+        </DialogHeader>
+        {expectedSerial && (
+          <div className="text-xs bg-muted/40 border rounded-md p-2 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-primary" />
+            <span>
+              الرقم المتوقع للعداد:{" "}
+              <span className="font-mono font-semibold" dir="ltr">
+                {expectedSerial}
+              </span>
+            </span>
+          </div>
+        )}
+        {resolvedProfile && (
+          <div className="text-xs bg-muted/40 border rounded-md p-2">
+            مواصفة القراءة: {resolvedProfile.integerDigits} أرقام صحيحة +{" "}
+            {resolvedProfile.decimalDigits} أرقام عشرية · ترتيب السجل:{" "}
+            {resolvedProfile.registerOrder === "integer_then_decimal"
+              ? "صحيح ثم عشري"
+              : "عشري ثم صحيح"}
+          </div>
+        )}
+        <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+          <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
+          <canvas ref={canvasRef} className="hidden" />
+          <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-16 border-2 border-yellow-400/80 rounded-md pointer-events-none" />
+          {busy && (
+            <div className="absolute inset-0 grid place-items-center bg-black/60 text-white text-sm">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <div>جارٍ تحليل الصورة… {progress}%</div>
+            </div>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => void choosePhoneImage(e.target.files?.[0])}
+        />
+        <p className="text-xs text-muted-foreground">
+          OCR اقتراح فقط. لا يتم اعتماد القراءة تلقائياً؛ عند الغموض أو عدم مطابقة مواصفة العداد يجب
+          مراجعتها وإدخالها يدوياً. ألوان السجل لا تُستخدم لاستنتاج الرقم.
+        </p>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            <X className="w-4 h-4 ms-1" /> إلغاء
+          </Button>
+          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
+            <ImagePlus className="w-4 h-4 ms-1" /> صورة من الهاتف
+          </Button>
+          <Button onClick={() => void capture()} disabled={!ready || busy}>
+            <ScanLine className="w-4 h-4 ms-1" /> التقاط وقراءة
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

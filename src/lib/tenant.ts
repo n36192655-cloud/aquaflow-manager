@@ -12,7 +12,13 @@ export type Tenant = {
 
 export async function getCurrentTenant(tenantId: string | undefined): Promise<Tenant | null> {
   if (!tenantId) return null;
-  const { data, error } = await supabase.from("tenants").select("id,name,project_name,tenant_type,parent_tenant_id,subscription_status,subscription_expires_at").eq("id", tenantId).maybeSingle();
+  const { data, error } = await supabase
+    .from("tenants")
+    .select(
+      "id,name,project_name,tenant_type,parent_tenant_id,subscription_status,subscription_expires_at",
+    )
+    .eq("id", tenantId)
+    .maybeSingle();
   if (error) throw error;
   return data as Tenant | null;
 }

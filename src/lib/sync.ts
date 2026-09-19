@@ -54,9 +54,14 @@ async function all(): Promise<PendingReading[]> {
     const req = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
     req.onsuccess = () => {
       db.close();
-      resolve((req.result as PendingReading[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+      resolve(
+        (req.result as PendingReading[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      );
     };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onerror = () => {
+      db.close();
+      reject(req.error);
+    };
   });
 }
 
@@ -64,8 +69,14 @@ async function put(item: PendingReading): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const req = db.transaction(STORE, "readwrite").objectStore(STORE).put(item);
-    req.onsuccess = () => { db.close(); resolve(); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => {
+      db.close();
+      resolve();
+    };
+    req.onerror = () => {
+      db.close();
+      reject(req.error);
+    };
   });
 }
 
@@ -73,15 +84,25 @@ async function remove(clientId: string): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const req = db.transaction(STORE, "readwrite").objectStore(STORE).delete(clientId);
-    req.onsuccess = () => { db.close(); resolve(); };
-    req.onerror = () => { db.close(); reject(req.error); };
+    req.onsuccess = () => {
+      db.close();
+      resolve();
+    };
+    req.onerror = () => {
+      db.close();
+      reject(req.error);
+    };
   });
 }
 
-export async function getPending(): Promise<PendingReading[]> { return all(); }
+export async function getPending(): Promise<PendingReading[]> {
+  return all();
+}
 
 export async function addPending(
-  input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & { clientId?: string },
+  input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & {
+    clientId?: string;
+  },
 ): Promise<PendingReading> {
   if (input.imageData && input.imageData.length > MAX_OFFLINE_IMAGE_DATA_URL_CHARS) {
     throw new Error("Meter image is too large for offline storage");
@@ -111,7 +132,8 @@ async function uploadOfflineImage(item: PendingReading): Promise<string | undefi
 
 let syncRunning = false;
 export async function syncPending(): Promise<{ synced: number; failed: number }> {
-  if (syncRunning || typeof navigator === "undefined" || !navigator.onLine) return { synced: 0, failed: 0 };
+  if (syncRunning || typeof navigator === "undefined" || !navigator.onLine)
+    return { synced: 0, failed: 0 };
   syncRunning = true;
   let synced = 0;
   let failed = 0;
@@ -141,7 +163,12 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
         synced += 1;
       } catch (e) {
         const retryCount = item.retryCount + 1;
-        await put({ ...item, state: "failed", retryCount, lastError: "تعذر مزامنة القراءة؛ ستتم إعادة المحاولة عند توفر الاتصال." });
+        await put({
+          ...item,
+          state: "failed",
+          retryCount,
+          lastError: "تعذر مزامنة القراءة؛ ستتم إعادة المحاولة عند توفر الاتصال.",
+        });
         failed += 1;
       }
     }
@@ -155,11 +182,16 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
 export function useOnlineStatus() {
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   useEffect(() => {
-    const on = () => { setOnline(true); void syncPending(); };
+    const on = () => {
+      setOnline(true);
+      void syncPending();
+    };
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    const timer = window.setInterval(() => { if (navigator.onLine) void syncPending(); }, 30000);
+    const timer = window.setInterval(() => {
+      if (navigator.onLine) void syncPending();
+    }, 30000);
     void syncPending();
     return () => {
       window.removeEventListener("online", on);

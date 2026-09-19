@@ -31,16 +31,44 @@ function ForgotPasswordPage() {
     }
   }
 
-  return <div className="min-h-screen grid place-items-center px-4 bg-background" dir="rtl">
-    <Card className="w-full max-w-md">
-      <CardHeader><CardTitle>استعادة كلمة المرور</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">أدخل اسم المستخدم. إذا كان للحساب بريد استرداد موثّق، سيصل إليه رابط إعادة التعيين.</p>
-        <div><Label htmlFor="username">اسم المستخدم</Label><Input id="username" dir="ltr" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} /></div>
-        <Button className="w-full" onClick={() => void submit()} disabled={busy || !username.trim()}>{busy ? "جارٍ الإرسال…" : "إرسال رابط الاستعادة"}</Button>
-        {sent && <p className="text-sm text-muted-foreground rounded-md border p-3">إذا كان الحساب مؤهلاً للاستعادة، ستصلك رسالة على بريد الاسترداد المسجّل. لا تكشف المنصة ما إذا كان اسم المستخدم موجوداً.</p>}
-        <Link to="/login" className="block text-center text-sm underline">العودة لتسجيل الدخول</Link>
-      </CardContent>
-    </Card>
-  </div>;
+  return (
+    <div className="min-h-screen grid place-items-center px-4 bg-background" dir="rtl">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>استعادة كلمة المرور</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            أدخل اسم المستخدم. إذا كان للحساب بريد استرداد موثّق، سيصل إليه رابط إعادة التعيين.
+          </p>
+          <div>
+            <Label htmlFor="username">اسم المستخدم</Label>
+            <Input
+              id="username"
+              dir="ltr"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={() => void submit()}
+            disabled={busy || !username.trim()}
+          >
+            {busy ? "جارٍ الإرسال…" : "إرسال رابط الاستعادة"}
+          </Button>
+          {sent && (
+            <p className="text-sm text-muted-foreground rounded-md border p-3">
+              إذا كان الحساب مؤهلاً للاستعادة، ستصلك رسالة على بريد الاسترداد المسجّل. لا تكشف
+              المنصة ما إذا كان اسم المستخدم موجوداً.
+            </p>
+          )}
+          <Link to="/login" className="block text-center text-sm underline">
+            العودة لتسجيل الدخول
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

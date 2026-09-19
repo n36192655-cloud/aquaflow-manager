@@ -23,10 +23,7 @@ export function SubscriberSearch({ value, onChange, placeholder }: Props) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const activeMeters = useMemo(
-    () => meters.filter((m) => m.status === "active"),
-    [meters],
-  );
+  const activeMeters = useMemo(() => meters.filter((m) => m.status === "active"), [meters]);
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -66,7 +63,10 @@ export function SubscriberSearch({ value, onChange, placeholder }: Props) {
           placeholder={placeholder ?? "ابحث بالاسم أو رقم العداد…"}
           value={q}
           onFocus={() => setOpen(true)}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
         />
       </div>
       {open && (

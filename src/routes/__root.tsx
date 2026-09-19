@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -7,22 +14,113 @@ import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/app-shell";
 import { supabase } from "@/lib/supabase";
 
-function NotFoundComponent() { return <div className="flex min-h-screen items-center justify-center bg-background px-4"><div className="max-w-md text-center"><h1 className="text-7xl font-bold">404</h1><h2 className="mt-4 text-xl font-semibold">الصفحة غير موجودة</h2><p className="mt-2 text-sm text-muted-foreground">الصفحة المطلوبة غير موجودة أو تم نقلها.</p><div className="mt-6"><Link to="/" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">العودة للرئيسية</Link></div></div></div>; }
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) { console.error(error); const router = useRouter(); useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]); return <div className="flex min-h-screen items-center justify-center bg-background px-4"><div className="max-w-md text-center"><h1 className="text-xl font-semibold">تعذر تحميل الصفحة</h1><p className="mt-2 text-sm text-muted-foreground">حدث خطأ. حاول التحديث أو العودة للرئيسية.</p><button onClick={() => { router.invalidate(); reset(); }} className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">حاول مرة أخرى</button></div></div>; }
+function NotFoundComponent() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-7xl font-bold">404</h1>
+        <h2 className="mt-4 text-xl font-semibold">الصفحة غير موجودة</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          الصفحة المطلوبة غير موجودة أو تم نقلها.
+        </p>
+        <div className="mt-6">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            العودة للرئيسية
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error(error);
+  const router = useRouter();
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold">تعذر تحميل الصفحة</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          حدث خطأ. حاول التحديث أو العودة للرئيسية.
+        </p>
+        <button
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+          className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+        >
+          حاول مرة أخرى
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({ meta: [
-    { charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1" },
-    { title: "منصة ميزان لإستدامة خدمات المياه" },
-    { name: "description", content: "منصة ميزان لإستدامة خدمات المياه — إدارة المشتركين والعدادات والقراءات والفواتير والتحصيل والفاقد." },
-    { name: "author", content: "MIZAN" }, { property: "og:title", content: "منصة ميزان لإستدامة خدمات المياه" },
-    { property: "og:description", content: "إدارة تشغيلية متكاملة لخدمات المياه." }, { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-  ], links: [{ rel: "stylesheet", href: appCss }, { rel: "icon", href: "/favicon.ico", type: "image/x-icon" }, { rel: "preconnect", href: "https://fonts.googleapis.com" }, { rel: "preconnect", href: "https://fonts.gstatic.com" }, { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" }] }),
-  shellComponent: RootShell, component: RootComponent, notFoundComponent: NotFoundComponent, errorComponent: ErrorComponent,
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "منصة ميزان لإستدامة خدمات المياه" },
+      {
+        name: "description",
+        content:
+          "منصة ميزان لإستدامة خدمات المياه — إدارة المشتركين والعدادات والقراءات والفواتير والتحصيل والفاقد.",
+      },
+      { name: "author", content: "MIZAN" },
+      { property: "og:title", content: "منصة ميزان لإستدامة خدمات المياه" },
+      { property: "og:description", content: "إدارة تشغيلية متكاملة لخدمات المياه." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap",
+      },
+    ],
+  }),
+  shellComponent: RootShell,
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorComponent,
 });
-function RootShell({ children }: { children: ReactNode }) { return <html lang="ar" dir="rtl"><head><HeadContent /></head><body>{children}<Scripts /></body></html>; }
-function RootComponent() { const { queryClient } = Route.useRouteContext(); return <QueryClientProvider client={queryClient}><SubscriptionGuard><AppShell><Outlet /></AppShell></SubscriptionGuard><Toaster position="top-center" richColors /></QueryClientProvider>; }
+function RootShell({ children }: { children: ReactNode }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SubscriptionGuard>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+      </SubscriptionGuard>
+      <Toaster position="top-center" richColors />
+    </QueryClientProvider>
+  );
+}
 
 function SubscriptionGuard({ children }: { children: ReactNode }) {
   const [state, setState] = useState<"loading" | "ok" | "locked">("loading");
@@ -103,4 +201,29 @@ function SubscriptionGuard({ children }: { children: ReactNode }) {
   if (state === "locked") return <SubscriptionLockScreen reason={reason} />;
   return <>{children}</>;
 }
-function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | null }) { return <div className="min-h-screen flex items-center justify-center bg-background px-4" dir="rtl"><div className="max-w-md text-center space-y-4"><div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 grid place-items-center"><span className="text-3xl">🔒</span></div><h1 className="text-2xl font-bold">{reason === "expired" ? "انتهى الاشتراك" : reason === "suspended" ? "الاشتراك موقوف" : "تعذر التحقق من حالة الاشتراك"}</h1><p className="text-sm text-muted-foreground">{reason ? "مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي. يرجى التواصل مع مالك المنصة." : "تعذر التحقق من حالة الاشتراك بشكل آمن. أعد المحاولة بعد استقرار الاتصال."}</p><div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground">منصة ميزان لإستدامة خدمات المياه</div></div></div>; }
+function SubscriptionLockScreen({ reason }: { reason: "suspended" | "expired" | null }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background px-4" dir="rtl">
+      <div className="max-w-md text-center space-y-4">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-destructive/10 grid place-items-center">
+          <span className="text-3xl">🔒</span>
+        </div>
+        <h1 className="text-2xl font-bold">
+          {reason === "expired"
+            ? "انتهى الاشتراك"
+            : reason === "suspended"
+              ? "الاشتراك موقوف"
+              : "تعذر التحقق من حالة الاشتراك"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {reason
+            ? "مشروع المياه الخاص بك غير قادر على استخدام منصة ميزان في الوقت الحالي. يرجى التواصل مع مالك المنصة."
+            : "تعذر التحقق من حالة الاشتراك بشكل آمن. أعد المحاولة بعد استقرار الاتصال."}
+        </p>
+        <div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground">
+          منصة ميزان لإستدامة خدمات المياه
+        </div>
+      </div>
+    </div>
+  );
+}

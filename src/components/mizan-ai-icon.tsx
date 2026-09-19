@@ -23,13 +23,31 @@ export function MizanAiIcon({ className, size = 24 }: Props) {
       {/* Beam */}
       <path d="M8 16 L40 16" stroke="url(#mizan-ai-grad)" strokeWidth="2.5" strokeLinecap="round" />
       {/* Pillar */}
-      <path d="M24 16 L24 36" stroke="url(#mizan-ai-grad)" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M24 16 L24 36"
+        stroke="url(#mizan-ai-grad)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Base */}
-      <path d="M17 36 L31 36" stroke="url(#mizan-ai-grad)" strokeWidth="2.5" strokeLinecap="round" />
+      <path
+        d="M17 36 L31 36"
+        stroke="url(#mizan-ai-grad)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
       {/* Left pan */}
-      <path d="M8 16 L4 24 Q4 27 8 27 Q12 27 12 24 L8 16 Z" fill="url(#mizan-ai-grad)" opacity="0.85" />
+      <path
+        d="M8 16 L4 24 Q4 27 8 27 Q12 27 12 24 L8 16 Z"
+        fill="url(#mizan-ai-grad)"
+        opacity="0.85"
+      />
       {/* Right pan */}
-      <path d="M40 16 L36 24 Q36 27 40 27 Q44 27 44 24 L40 16 Z" fill="url(#mizan-ai-grad)" opacity="0.85" />
+      <path
+        d="M40 16 L36 24 Q36 27 40 27 Q44 27 44 24 L40 16 Z"
+        fill="url(#mizan-ai-grad)"
+        opacity="0.85"
+      />
       {/* Circuit dots */}
       <circle cx="8" cy="16" r="1.6" fill="white" />
       <circle cx="40" cy="16" r="1.6" fill="white" />

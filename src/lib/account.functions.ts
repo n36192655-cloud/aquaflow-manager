@@ -55,14 +55,20 @@ async function authFailure(): Promise<never> {
 }
 
 function bearerToken(): string {
-  return getRequestHeader("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
+  return (
+    getRequestHeader("authorization")
+      ?.replace(/^Bearer\s+/i, "")
+      .trim() ?? ""
+  );
 }
 
 export const loginWithUsername = createServerFn({ method: "POST" })
-  .validator(z.object({
-    username: z.string().trim().min(1).max(80),
-    password: z.string().min(1).max(128),
-  }))
+  .validator(
+    z.object({
+      username: z.string().trim().min(1).max(80),
+      password: z.string().min(1).max(128),
+    }),
+  )
   .handler(async ({ data }) => {
     const secret = createSecretSupabaseClient();
     const normalized = data.username.toLowerCase();
@@ -80,7 +86,9 @@ export const loginWithUsername = createServerFn({ method: "POST" })
       .maybeSingle();
     if (profileError || !profile) return authFailure();
 
-    const { data: authUser, error: authUserError } = await secret.auth.admin.getUserById(profile.id);
+    const { data: authUser, error: authUserError } = await secret.auth.admin.getUserById(
+      profile.id,
+    );
     if (authUserError || !authUser.user?.email) return authFailure();
 
     const publicClient = createPublicSupabaseClient();

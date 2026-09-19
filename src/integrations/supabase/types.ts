@@ -1,722 +1,1072 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
+    PostgrestVersion: "14.5";
+  };
   public: {
     Tables: {
       audit_logs: {
         Row: {
-          action: string
-          created_at: string
-          entity: string | null
-          entity_id: string | null
-          id: string
-          meta: Json | null
-          tenant_id: string | null
-          user_id: string | null
-        }
+          action: string;
+          created_at: string;
+          entity: string | null;
+          entity_id: string | null;
+          id: string;
+          meta: Json | null;
+          tenant_id: string | null;
+          user_id: string | null;
+        };
         Insert: {
-          action: string
-          created_at?: string
-          entity?: string | null
-          entity_id?: string | null
-          id?: string
-          meta?: Json | null
-          tenant_id?: string | null
-          user_id?: string | null
-        }
+          action: string;
+          created_at?: string;
+          entity?: string | null;
+          entity_id?: string | null;
+          id?: string;
+          meta?: Json | null;
+          tenant_id?: string | null;
+          user_id?: string | null;
+        };
         Update: {
-          action?: string
-          created_at?: string
-          entity?: string | null
-          entity_id?: string | null
-          id?: string
-          meta?: Json | null
-          tenant_id?: string | null
-          user_id?: string | null
-        }
+          action?: string;
+          created_at?: string;
+          entity?: string | null;
+          entity_id?: string | null;
+          id?: string;
+          meta?: Json | null;
+          tenant_id?: string | null;
+          user_id?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "audit_logs_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "audit_logs_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       customers: {
         Row: {
-          address: string | null
-          created_at: string
-          id: string
-          name: string
-          pay_account: string | null
-          phone: string | null
-          status: string
-          tenant_id: string
-          updated_at: string
-          household_size: number
-        }
+          address: string | null;
+          created_at: string;
+          id: string;
+          name: string;
+          pay_account: string | null;
+          phone: string | null;
+          status: string;
+          tenant_id: string;
+          updated_at: string;
+          household_size: number;
+        };
         Insert: {
-          address?: string | null
-          created_at?: string
-          id?: string
-          name: string
-          pay_account?: string | null
-          phone?: string | null
-          status?: string
-          tenant_id: string
-          updated_at?: string
-          household_size?: number
-        }
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          name: string;
+          pay_account?: string | null;
+          phone?: string | null;
+          status?: string;
+          tenant_id: string;
+          updated_at?: string;
+          household_size?: number;
+        };
         Update: {
-          address?: string | null
-          created_at?: string
-          id?: string
-          name?: string
-          pay_account?: string | null
-          phone?: string | null
-          status?: string
-          tenant_id?: string
-          updated_at?: string
-          household_size?: number
-        }
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          pay_account?: string | null;
+          phone?: string | null;
+          status?: string;
+          tenant_id?: string;
+          updated_at?: string;
+          household_size?: number;
+        };
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "customers_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       payments: {
         Row: {
-          amount: number
-          bill_id: string
-          collector_id: string | null
-          created_at: string
-          id: string
-          method: string
-          status: string
-          tenant_id: string
-          client_id: string | null
-          review_reason: string | null
-          approved_by: string | null
-          approved_at: string | null
-          rejected_at: string | null
-        }
+          amount: number;
+          bill_id: string;
+          collector_id: string | null;
+          created_at: string;
+          id: string;
+          method: string;
+          status: string;
+          tenant_id: string;
+          client_id: string | null;
+          review_reason: string | null;
+          approved_by: string | null;
+          approved_at: string | null;
+          rejected_at: string | null;
+        };
         Insert: {
-          amount: number
-          bill_id: string
-          collector_id?: string | null
-          created_at?: string
-          id?: string
-          method?: string
-          status?: string
-          tenant_id: string
-          client_id?: string | null
-          review_reason?: string | null
-          approved_by?: string | null
-          approved_at?: string | null
-          rejected_at?: string | null
-        }
+          amount: number;
+          bill_id: string;
+          collector_id?: string | null;
+          created_at?: string;
+          id?: string;
+          method?: string;
+          status?: string;
+          tenant_id: string;
+          client_id?: string | null;
+          review_reason?: string | null;
+          approved_by?: string | null;
+          approved_at?: string | null;
+          rejected_at?: string | null;
+        };
         Update: {
-          amount?: number
-          bill_id?: string
-          collector_id?: string | null
-          created_at?: string
-          id?: string
-          method?: string
-          status?: string
-          tenant_id?: string
-          client_id?: string | null
-          review_reason?: string | null
-          approved_by?: string | null
-          approved_at?: string | null
-          rejected_at?: string | null
-        }
+          amount?: number;
+          bill_id?: string;
+          collector_id?: string | null;
+          created_at?: string;
+          id?: string;
+          method?: string;
+          status?: string;
+          tenant_id?: string;
+          client_id?: string | null;
+          review_reason?: string | null;
+          approved_by?: string | null;
+          approved_at?: string | null;
+          rejected_at?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "payments_bill_id_fkey"
-            columns: ["bill_id"]
-            isOneToOne: false
-            referencedRelation: "water_bills"
-            referencedColumns: ["id"]
+            foreignKeyName: "payments_bill_id_fkey";
+            columns: ["bill_id"];
+            isOneToOne: false;
+            referencedRelation: "water_bills";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "payments_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "payments_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       profiles: {
         Row: {
-          created_at: string
-          display_name: string | null
-          id: string
-          username: string | null
-          phone: string | null
-          tenant_id: string | null
-          updated_at: string
-        }
+          created_at: string;
+          display_name: string | null;
+          id: string;
+          username: string | null;
+          phone: string | null;
+          tenant_id: string | null;
+          updated_at: string;
+        };
         Insert: {
-          created_at?: string
-          display_name?: string | null
-          id: string
-          phone?: string | null
-          tenant_id?: string | null
-          username?: string | null
-          updated_at?: string
-        }
+          created_at?: string;
+          display_name?: string | null;
+          id: string;
+          phone?: string | null;
+          tenant_id?: string | null;
+          username?: string | null;
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          phone?: string | null
-          tenant_id?: string | null
-          username?: string | null
-          updated_at?: string
-        }
+          created_at?: string;
+          display_name?: string | null;
+          id?: string;
+          phone?: string | null;
+          tenant_id?: string | null;
+          username?: string | null;
+          updated_at?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "profiles_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "profiles_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       tenants: {
         Row: {
-          created_at: string
-          id: string
-          name: string
-          project_name: string | null
-          tenant_type: "project" | "central"
-          parent_tenant_id: string | null
-          subscription_expires_at: string | null
-          subscription_status: Database["public"]["Enums"]["subscription_status"]
-          updated_at: string
-        }
+          created_at: string;
+          id: string;
+          name: string;
+          project_name: string | null;
+          tenant_type: "project" | "central";
+          parent_tenant_id: string | null;
+          subscription_expires_at: string | null;
+          subscription_status: Database["public"]["Enums"]["subscription_status"];
+          updated_at: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          project_name?: string | null
-          tenant_type?: "project" | "central"
-          parent_tenant_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_status?: Database["public"]["Enums"]["subscription_status"]
-          updated_at?: string
-        }
+          created_at?: string;
+          id?: string;
+          name: string;
+          project_name?: string | null;
+          tenant_type?: "project" | "central";
+          parent_tenant_id?: string | null;
+          subscription_expires_at?: string | null;
+          subscription_status?: Database["public"]["Enums"]["subscription_status"];
+          updated_at?: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          project_name?: string | null
-          tenant_type?: "project" | "central"
-          parent_tenant_id?: string | null
-          subscription_expires_at?: string | null
-          subscription_status?: Database["public"]["Enums"]["subscription_status"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          id?: string;
+          name?: string;
+          project_name?: string | null;
+          tenant_type?: "project" | "central";
+          parent_tenant_id?: string | null;
+          subscription_expires_at?: string | null;
+          subscription_status?: Database["public"]["Enums"]["subscription_status"];
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          tenant_id: string | null
-          user_id: string
-          must_change_password: boolean
-        }
+          created_at: string;
+          id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          tenant_id: string | null;
+          user_id: string;
+          must_change_password: boolean;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          tenant_id?: string | null
-          user_id: string
-          must_change_password?: boolean
-        }
+          created_at?: string;
+          id?: string;
+          role: Database["public"]["Enums"]["app_role"];
+          tenant_id?: string | null;
+          user_id: string;
+          must_change_password?: boolean;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          tenant_id?: string | null
-          user_id?: string
-          must_change_password?: boolean
-        }
+          created_at?: string;
+          id?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          tenant_id?: string | null;
+          user_id?: string;
+          must_change_password?: boolean;
+        };
         Relationships: [
           {
-            foreignKeyName: "user_roles_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "user_roles_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       water_bills: {
         Row: {
-          arrears: number
-          created_at: string
-          customer_id: string
-          id: string
-          issued_at: string
-          reading_id: string | null
-          status: string
-          subtotal: number
-          tenant_id: string
-          total: number
-          tariff_plan_id: string | null
-          tariff_category: string | null
-          consumption_lpd: number | null
-          tariff_breakdown: Json
-          cycle_id: string | null
-          project_name: string | null
-          client_id: string | null
-        }
+          arrears: number;
+          created_at: string;
+          customer_id: string;
+          id: string;
+          issued_at: string;
+          reading_id: string | null;
+          status: string;
+          subtotal: number;
+          tenant_id: string;
+          total: number;
+          tariff_plan_id: string | null;
+          tariff_category: string | null;
+          consumption_lpd: number | null;
+          tariff_breakdown: Json;
+          cycle_id: string | null;
+          project_name: string | null;
+          client_id: string | null;
+        };
         Insert: {
-          arrears?: number
-          created_at?: string
-          customer_id: string
-          id?: string
-          issued_at?: string
-          reading_id?: string | null
-          status?: string
-          subtotal?: number
-          tenant_id: string
-          total?: number
-          tariff_plan_id?: string | null
-          tariff_category?: string | null
-          consumption_lpd?: number | null
-          tariff_breakdown?: Json
-          cycle_id?: string | null
-          project_name?: string | null
-          client_id?: string | null
-        }
+          arrears?: number;
+          created_at?: string;
+          customer_id: string;
+          id?: string;
+          issued_at?: string;
+          reading_id?: string | null;
+          status?: string;
+          subtotal?: number;
+          tenant_id: string;
+          total?: number;
+          tariff_plan_id?: string | null;
+          tariff_category?: string | null;
+          consumption_lpd?: number | null;
+          tariff_breakdown?: Json;
+          cycle_id?: string | null;
+          project_name?: string | null;
+          client_id?: string | null;
+        };
         Update: {
-          arrears?: number
-          created_at?: string
-          customer_id?: string
-          id?: string
-          issued_at?: string
-          reading_id?: string | null
-          status?: string
-          subtotal?: number
-          tenant_id?: string
-          total?: number
-          tariff_plan_id?: string | null
-          tariff_category?: string | null
-          consumption_lpd?: number | null
-          tariff_breakdown?: Json
-          cycle_id?: string | null
-          project_name?: string | null
-          client_id?: string | null
-        }
+          arrears?: number;
+          created_at?: string;
+          customer_id?: string;
+          id?: string;
+          issued_at?: string;
+          reading_id?: string | null;
+          status?: string;
+          subtotal?: number;
+          tenant_id?: string;
+          total?: number;
+          tariff_plan_id?: string | null;
+          tariff_category?: string | null;
+          consumption_lpd?: number | null;
+          tariff_breakdown?: Json;
+          cycle_id?: string | null;
+          project_name?: string | null;
+          client_id?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "water_bills_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            foreignKeyName: "water_bills_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "water_bills_reading_id_fkey"
-            columns: ["reading_id"]
-            isOneToOne: false
-            referencedRelation: "water_readings"
-            referencedColumns: ["id"]
+            foreignKeyName: "water_bills_reading_id_fkey";
+            columns: ["reading_id"];
+            isOneToOne: false;
+            referencedRelation: "water_readings";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "water_bills_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "water_bills_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       water_readings: {
         Row: {
-          consumption: number
-          created_at: string
-          current_reading: number
-          customer_id: string | null
-          flag: string
-          id: string
-          lat: number | null
-          lng: number | null
-          meter_number: string
-          photo_url: string | null
-          previous: number
-          reader_id: string | null
-          status: string
-          tenant_id: string
-          meter_id: string | null
-          capture_source: string
-          ocr_serial: string | null
-          ocr_confidence: number | null
-          ocr_raw_text: string | null
-          identity_verified: boolean
-          reading_verified: boolean
-          review_reason: string | null
-          client_id: string | null
-          source_device: string | null
-          verification_status: string
-          verified_by: string | null
-          verified_at: string | null
-          rejection_reason: string | null
-        }
+          consumption: number;
+          created_at: string;
+          current_reading: number;
+          customer_id: string | null;
+          flag: string;
+          id: string;
+          lat: number | null;
+          lng: number | null;
+          meter_number: string;
+          photo_url: string | null;
+          previous: number;
+          reader_id: string | null;
+          status: string;
+          tenant_id: string;
+          meter_id: string | null;
+          capture_source: string;
+          ocr_serial: string | null;
+          ocr_confidence: number | null;
+          ocr_raw_text: string | null;
+          identity_verified: boolean;
+          reading_verified: boolean;
+          review_reason: string | null;
+          client_id: string | null;
+          source_device: string | null;
+          verification_status: string;
+          verified_by: string | null;
+          verified_at: string | null;
+          rejection_reason: string | null;
+        };
         Insert: {
-          consumption?: number
-          created_at?: string
-          current_reading: number
-          customer_id?: string | null
-          flag?: string
-          id?: string
-          lat?: number | null
-          lng?: number | null
-          meter_number: string
-          photo_url?: string | null
-          previous?: number
-          reader_id?: string | null
-          status?: string
-          tenant_id: string
-          meter_id?: string | null
-          capture_source?: string
-          ocr_serial?: string | null
-          ocr_confidence?: number | null
-          ocr_raw_text?: string | null
-          identity_verified?: boolean
-          reading_verified?: boolean
-          review_reason?: string | null
-          client_id?: string | null
-          source_device?: string | null
-          verification_status?: string
-          verified_by?: string | null
-          verified_at?: string | null
-          rejection_reason?: string | null
-        }
+          consumption?: number;
+          created_at?: string;
+          current_reading: number;
+          customer_id?: string | null;
+          flag?: string;
+          id?: string;
+          lat?: number | null;
+          lng?: number | null;
+          meter_number: string;
+          photo_url?: string | null;
+          previous?: number;
+          reader_id?: string | null;
+          status?: string;
+          tenant_id: string;
+          meter_id?: string | null;
+          capture_source?: string;
+          ocr_serial?: string | null;
+          ocr_confidence?: number | null;
+          ocr_raw_text?: string | null;
+          identity_verified?: boolean;
+          reading_verified?: boolean;
+          review_reason?: string | null;
+          client_id?: string | null;
+          source_device?: string | null;
+          verification_status?: string;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          rejection_reason?: string | null;
+        };
         Update: {
-          consumption?: number
-          created_at?: string
-          current_reading?: number
-          customer_id?: string | null
-          flag?: string
-          id?: string
-          lat?: number | null
-          lng?: number | null
-          meter_number?: string
-          photo_url?: string | null
-          previous?: number
-          reader_id?: string | null
-          status?: string
-          tenant_id?: string
-          meter_id?: string | null
-          capture_source?: string
-          ocr_serial?: string | null
-          ocr_confidence?: number | null
-          ocr_raw_text?: string | null
-          identity_verified?: boolean
-          reading_verified?: boolean
-          review_reason?: string | null
-          client_id?: string | null
-          source_device?: string | null
-          verification_status?: string
-          verified_by?: string | null
-          verified_at?: string | null
-          rejection_reason?: string | null
-        }
+          consumption?: number;
+          created_at?: string;
+          current_reading?: number;
+          customer_id?: string | null;
+          flag?: string;
+          id?: string;
+          lat?: number | null;
+          lng?: number | null;
+          meter_number?: string;
+          photo_url?: string | null;
+          previous?: number;
+          reader_id?: string | null;
+          status?: string;
+          tenant_id?: string;
+          meter_id?: string | null;
+          capture_source?: string;
+          ocr_serial?: string | null;
+          ocr_confidence?: number | null;
+          ocr_raw_text?: string | null;
+          identity_verified?: boolean;
+          reading_verified?: boolean;
+          review_reason?: string | null;
+          client_id?: string | null;
+          source_device?: string | null;
+          verification_status?: string;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          rejection_reason?: string | null;
+        };
         Relationships: [
           {
-            foreignKeyName: "water_readings_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            foreignKeyName: "water_readings_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "water_readings_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            foreignKeyName: "water_readings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       meter_profiles: {
-        Row: { id: string; tenant_id: string; name: string; display_type: string; integer_digits: number; decimal_digits: number; register_order: string; color_semantics: Json; unit: string; created_at: string; updated_at: string }
-        Insert: { id?: string; tenant_id: string; name: string; display_type: string; integer_digits?: number; decimal_digits?: number; register_order?: string; color_semantics?: Json; unit?: string; created_at?: string; updated_at?: string }
-        Update: { id?: string; tenant_id?: string; name?: string; display_type?: string; integer_digits?: number; decimal_digits?: number; register_order?: string; color_semantics?: Json; unit?: string; created_at?: string; updated_at?: string }
-        Relationships: [{ foreignKeyName: "meter_profiles_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          display_type: string;
+          integer_digits: number;
+          decimal_digits: number;
+          register_order: string;
+          color_semantics: Json;
+          unit: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          display_type: string;
+          integer_digits?: number;
+          decimal_digits?: number;
+          register_order?: string;
+          color_semantics?: Json;
+          unit?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          display_type?: string;
+          integer_digits?: number;
+          decimal_digits?: number;
+          register_order?: string;
+          color_semantics?: Json;
+          unit?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meter_profiles_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       meters: {
-        Row: { id: string; tenant_id: string; customer_id: string; profile_id: string | null; serial_number: string; status: string; installed_at: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; tenant_id: string; customer_id: string; profile_id?: string | null; serial_number: string; status?: string; installed_at?: string | null; created_at?: string; updated_at?: string }
-        Update: { id?: string; tenant_id?: string; customer_id?: string; profile_id?: string | null; serial_number?: string; status?: string; installed_at?: string | null; created_at?: string; updated_at?: string }
-        Relationships: [{ foreignKeyName: "meters_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }, { foreignKeyName: "meters_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }, { foreignKeyName: "meters_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "meter_profiles"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          tenant_id: string;
+          customer_id: string;
+          profile_id: string | null;
+          serial_number: string;
+          status: string;
+          installed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          customer_id: string;
+          profile_id?: string | null;
+          serial_number: string;
+          status?: string;
+          installed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          customer_id?: string;
+          profile_id?: string | null;
+          serial_number?: string;
+          status?: string;
+          installed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meters_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meters_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meters_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "meter_profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       billing_cycles: {
-        Row: { id: string; tenant_id: string; cycle_key: string; starts_at: string; ends_at: string; status: string; created_at: string }
-        Insert: { id?: string; tenant_id: string; cycle_key: string; starts_at: string; ends_at: string; status?: string; created_at?: string }
-        Update: { id?: string; tenant_id?: string; cycle_key?: string; starts_at?: string; ends_at?: string; status?: string; created_at?: string }
-        Relationships: [{ foreignKeyName: "billing_cycles_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          tenant_id: string;
+          cycle_key: string;
+          starts_at: string;
+          ends_at: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          cycle_key: string;
+          starts_at: string;
+          ends_at: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          cycle_key?: string;
+          starts_at?: string;
+          ends_at?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_cycles_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       water_production_logs: {
-        Row: { id: string; tenant_id: string; source_name: string; production_m3: number; recorded_at: string; capture_source: string; note: string | null; created_by: string | null; verification_status: string; verified_by: string | null; verified_at: string | null; review_reason: string | null; client_id: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; tenant_id: string; source_name: string; production_m3: number; recorded_at?: string; capture_source?: string; note?: string | null; created_by?: string | null; verification_status?: string; verified_by?: string | null; verified_at?: string | null; review_reason?: string | null; client_id?: string | null; created_at?: string; updated_at?: string }
-        Update: { id?: string; tenant_id?: string; source_name?: string; production_m3?: number; recorded_at?: string; capture_source?: string; note?: string | null; created_by?: string | null; verification_status?: string; verified_by?: string | null; verified_at?: string | null; review_reason?: string | null; client_id?: string | null; created_at?: string; updated_at?: string }
-        Relationships: [{ foreignKeyName: "water_production_logs_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          tenant_id: string;
+          source_name: string;
+          production_m3: number;
+          recorded_at: string;
+          capture_source: string;
+          note: string | null;
+          created_by: string | null;
+          verification_status: string;
+          verified_by: string | null;
+          verified_at: string | null;
+          review_reason: string | null;
+          client_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          source_name: string;
+          production_m3: number;
+          recorded_at?: string;
+          capture_source?: string;
+          note?: string | null;
+          created_by?: string | null;
+          verification_status?: string;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          review_reason?: string | null;
+          client_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          source_name?: string;
+          production_m3?: number;
+          recorded_at?: string;
+          capture_source?: string;
+          note?: string | null;
+          created_by?: string | null;
+          verification_status?: string;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          review_reason?: string | null;
+          client_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "water_production_logs_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       water_tariff_plans: {
-        Row: { id: string; tenant_id: string; name: string; currency_code: string; benchmark_lpd: number; basic_lpd: number; optimal_lpd: number; effective_from: string; effective_to: string | null; active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; tenant_id: string; name: string; currency_code?: string; benchmark_lpd?: number; basic_lpd?: number; optimal_lpd?: number; effective_from?: string; effective_to?: string | null; active?: boolean; created_at?: string; updated_at?: string }
-        Update: { id?: string; tenant_id?: string; name?: string; currency_code?: string; benchmark_lpd?: number; basic_lpd?: number; optimal_lpd?: number; effective_from?: string; effective_to?: string | null; active?: boolean; created_at?: string; updated_at?: string }
-        Relationships: [{ foreignKeyName: "water_tariff_plans_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          currency_code: string;
+          benchmark_lpd: number;
+          basic_lpd: number;
+          optimal_lpd: number;
+          effective_from: string;
+          effective_to: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          currency_code?: string;
+          benchmark_lpd?: number;
+          basic_lpd?: number;
+          optimal_lpd?: number;
+          effective_from?: string;
+          effective_to?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          currency_code?: string;
+          benchmark_lpd?: number;
+          basic_lpd?: number;
+          optimal_lpd?: number;
+          effective_from?: string;
+          effective_to?: string | null;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "water_tariff_plans_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       water_tariff_tiers: {
-        Row: { id: string; plan_id: string; label: string; min_lpd: number; max_lpd: number | null; rate_per_m3: number; sort_order: number; created_at: string }
-        Insert: { id?: string; plan_id: string; label: string; min_lpd: number; max_lpd?: number | null; rate_per_m3: number; sort_order: number; created_at?: string }
-        Update: { id?: string; plan_id?: string; label?: string; min_lpd?: number; max_lpd?: number | null; rate_per_m3?: number; sort_order?: number; created_at?: string }
-        Relationships: [{ foreignKeyName: "water_tariff_tiers_plan_id_fkey"; columns: ["plan_id"]; isOneToOne: false; referencedRelation: "water_tariff_plans"; referencedColumns: ["id"] }]
-      }
+        Row: {
+          id: string;
+          plan_id: string;
+          label: string;
+          min_lpd: number;
+          max_lpd: number | null;
+          rate_per_m3: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          label: string;
+          min_lpd: number;
+          max_lpd?: number | null;
+          rate_per_m3: number;
+          sort_order: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          plan_id?: string;
+          label?: string;
+          min_lpd?: number;
+          max_lpd?: number | null;
+          rate_per_m3?: number;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "water_tariff_tiers_plan_id_fkey";
+            columns: ["plan_id"];
+            isOneToOne: false;
+            referencedRelation: "water_tariff_plans";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       auth_rate_limits: {
-        Row: { rate_key_hash: string; window_started_at: string; hit_count: number; updated_at: string }
-        Insert: { rate_key_hash: string; window_started_at?: string; hit_count?: number; updated_at?: string }
-        Update: { rate_key_hash?: string; window_started_at?: string; hit_count?: number; updated_at?: string }
-        Relationships: []
-      }
-    }
+        Row: {
+          rate_key_hash: string;
+          window_started_at: string;
+          hit_count: number;
+          updated_at: string;
+        };
+        Insert: {
+          rate_key_hash: string;
+          window_started_at?: string;
+          hit_count?: number;
+          updated_at?: string;
+        };
+        Update: {
+          rate_key_hash?: string;
+          window_started_at?: string;
+          hit_count?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
-      consume_auth_rate_limit: { Args: { p_rate_key: string; p_limit: number; p_window_seconds: number }; Returns: boolean }
-      provision_tenant_user: { Args: { p_actor_user_id: string; p_user_id: string; p_tenant_id: string; p_username: string; p_display_name: string; p_role: Database["public"]["Enums"]["app_role"] }; Returns: undefined }
-      project_tenants: { Args: never; Returns: Database["public"]["Tables"]["tenants"]["Row"][]; SetofOptions: { from: "*"; to: "tenants"; isOneToOne: false; isSetofReturn: true } }
-      create_central_tenant: { Args: { _name: string }; Returns: string }
-      create_project_tenant: { Args: { _name: string }; Returns: string }
-      create_customer: { Args: { p_name: string; p_phone?: string | null; p_address?: string | null; p_pay_account?: string | null }; Returns: string }
-      deactivate_customer: { Args: { p_customer_id: string }; Returns: undefined }
-      create_meter_profile: { Args: { p_name: string; p_display_type: string; p_integer_digits: number; p_decimal_digits: number; p_register_order: string; p_color_semantics: Json }; Returns: string }
-      create_meter: { Args: { p_customer_id: string; p_serial_number: string; p_profile_id: string }; Returns: string }
-      deactivate_meter: { Args: { p_meter_id: string }; Returns: undefined }
-      record_water_reading: { Args: { p_meter_id: string; p_current: number; p_photo_url?: string | null; p_capture_source?: string; p_ocr_serial?: string | null; p_ocr_confidence?: number | null; p_ocr_raw_text?: string | null; p_client_id?: string | null; p_lat?: number | null; p_lng?: number | null; p_accuracy?: number | null }; Returns: any }
-      approve_water_reading: { Args: { p_reading_id: string }; Returns: any }
-      reject_water_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: any }
-      record_water_payment: { Args: { p_bill_id: string; p_amount: number; p_method: string; p_client_id?: string | null }; Returns: any }
-      approve_water_payment: { Args: { p_payment_id: string }; Returns: any }
-      reject_water_payment: { Args: { p_payment_id: string; p_reason: string }; Returns: any }
-      record_water_production: { Args: { p_source_name: string; p_production_m3: number; p_capture_source?: string; p_note?: string | null; p_recorded_at?: string; p_client_id?: string | null }; Returns: any }
-      simulate_household_water_use: { Args: { p_household_size: number; p_consumption_m3: number; p_days?: number }; Returns: any }
-      set_tenant_subscription_status: { Args: { p_tenant_id: string; p_status: string }; Returns: any }
+      consume_auth_rate_limit: {
+        Args: { p_rate_key: string; p_limit: number; p_window_seconds: number };
+        Returns: boolean;
+      };
+      provision_tenant_user: {
+        Args: {
+          p_actor_user_id: string;
+          p_user_id: string;
+          p_tenant_id: string;
+          p_username: string;
+          p_display_name: string;
+          p_role: Database["public"]["Enums"]["app_role"];
+        };
+        Returns: undefined;
+      };
+      project_tenants: {
+        Args: never;
+        Returns: Database["public"]["Tables"]["tenants"]["Row"][];
+        SetofOptions: { from: "*"; to: "tenants"; isOneToOne: false; isSetofReturn: true };
+      };
+      create_central_tenant: { Args: { _name: string }; Returns: string };
+      create_project_tenant: { Args: { _name: string }; Returns: string };
+      create_customer: {
+        Args: {
+          p_name: string;
+          p_phone?: string | null;
+          p_address?: string | null;
+          p_pay_account?: string | null;
+        };
+        Returns: string;
+      };
+      deactivate_customer: { Args: { p_customer_id: string }; Returns: undefined };
+      create_meter_profile: {
+        Args: {
+          p_name: string;
+          p_display_type: string;
+          p_integer_digits: number;
+          p_decimal_digits: number;
+          p_register_order: string;
+          p_color_semantics: Json;
+        };
+        Returns: string;
+      };
+      create_meter: {
+        Args: { p_customer_id: string; p_serial_number: string; p_profile_id: string };
+        Returns: string;
+      };
+      deactivate_meter: { Args: { p_meter_id: string }; Returns: undefined };
+      record_water_reading: {
+        Args: {
+          p_meter_id: string;
+          p_current: number;
+          p_photo_url?: string | null;
+          p_capture_source?: string;
+          p_ocr_serial?: string | null;
+          p_ocr_confidence?: number | null;
+          p_ocr_raw_text?: string | null;
+          p_client_id?: string | null;
+          p_lat?: number | null;
+          p_lng?: number | null;
+          p_accuracy?: number | null;
+        };
+        Returns: any;
+      };
+      approve_water_reading: { Args: { p_reading_id: string }; Returns: any };
+      reject_water_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: any };
+      record_water_payment: {
+        Args: {
+          p_bill_id: string;
+          p_amount: number;
+          p_method: string;
+          p_client_id?: string | null;
+        };
+        Returns: any;
+      };
+      approve_water_payment: { Args: { p_payment_id: string }; Returns: any };
+      reject_water_payment: { Args: { p_payment_id: string; p_reason: string }; Returns: any };
+      record_water_production: {
+        Args: {
+          p_source_name: string;
+          p_production_m3: number;
+          p_capture_source?: string;
+          p_note?: string | null;
+          p_recorded_at?: string;
+          p_client_id?: string | null;
+        };
+        Returns: any;
+      };
+      simulate_household_water_use: {
+        Args: { p_household_size: number; p_consumption_m3: number; p_days?: number };
+        Returns: any;
+      };
+      set_tenant_subscription_status: {
+        Args: { p_tenant_id: string; p_status: string };
+        Returns: any;
+      };
 
       activate_tenant: {
         Args: {
-          _days?: number
-          _license_key: string
-          _max_seats: number
-          _tenant_id: string
-        }
+          _days?: number;
+          _license_key: string;
+          _max_seats: number;
+          _tenant_id: string;
+        };
         Returns: {
-          created_at: string
-          id: string
-          name: string
-          subscription_expires_at: string | null
-          subscription_status: Database["public"]["Enums"]["subscription_status"]
-          updated_at: string
-        }
+          created_at: string;
+          id: string;
+          name: string;
+          subscription_expires_at: string | null;
+          subscription_status: Database["public"]["Enums"]["subscription_status"];
+          updated_at: string;
+        };
         SetofOptions: {
-          from: "*"
-          to: "tenants"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      complete_initial_password_change: { Args: never; Returns: undefined }
-      current_tenant_id: { Args: never; Returns: string }
+          from: "*";
+          to: "tenants";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      complete_initial_password_change: { Args: never; Returns: undefined };
+      current_tenant_id: { Args: never; Returns: string };
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
       has_tenant_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _tenant_id: string
-        }
-        Returns: boolean
-      }
-      is_super_admin: { Args: never; Returns: boolean },
+          _role: Database["public"]["Enums"]["app_role"];
+          _tenant_id: string;
+        };
+        Returns: boolean;
+      };
+      is_super_admin: { Args: never; Returns: boolean };
       central_dashboard_project_metrics: {
-        Args: { p_days?: number }
+        Args: { p_days?: number };
         Returns: {
-          tenant_id: string
-          project_name: string
-          subscription_status: string
-          active_customers: number
-          total_readings: number
-          approved_readings: number
-          pending_readings: number
-          rejected_readings: number
-          approved_consumption_m3: number
-          production_input_m3: number | null
-          water_efficiency_pct: number | null
-          metered_balance_gap_pct: number | null
-          billed_amount: number
-          collected_amount: number
-          collection_rate_pct: number | null
-        }[]
-      }
-    }
+          tenant_id: string;
+          project_name: string;
+          subscription_status: string;
+          active_customers: number;
+          total_readings: number;
+          approved_readings: number;
+          pending_readings: number;
+          rejected_readings: number;
+          approved_consumption_m3: number;
+          production_input_m3: number | null;
+          water_efficiency_pct: number | null;
+          metered_balance_gap_pct: number | null;
+          billed_amount: number;
+          collected_amount: number;
+          collection_rate_pct: number | null;
+        }[];
+      };
+    };
     Enums: {
-      app_role: "super_admin" | "manager" | "reader" | "collector"
-      subscription_status: "active" | "suspended" | "expired"
-    }
+      app_role: "super_admin" | "manager" | "reader" | "collector";
+      subscription_status: "active" | "suspended" | "expired";
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
@@ -725,4 +1075,4 @@ export const Constants = {
       subscription_status: ["active", "suspended", "expired"],
     },
   },
-} as const
+} as const;

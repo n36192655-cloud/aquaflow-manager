@@ -10,7 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AlertTriangle, Droplets, RefreshCw, TrendingDown } from "lucide-react";
 import { fmtNum } from "@/lib/pricing";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 export const Route = createFileRoute("/loss-analysis")({
   head: () => ({ meta: [{ title: "تحليل فاقد المياه — ميزان" }] }),
@@ -94,7 +103,9 @@ function LossAnalysisPage() {
     const [productionResult, readingsResult] = await Promise.all([
       supabase
         .from("water_production_logs")
-        .select("id,recorded_at,source_name,production_m3,note,capture_source,created_by,verification_status")
+        .select(
+          "id,recorded_at,source_name,production_m3,note,capture_source,created_by,verification_status",
+        )
         .eq("tenant_id", user.tenantId)
         .gte("recorded_at", start)
         .lt("recorded_at", end)
@@ -189,12 +200,14 @@ function LossAnalysisPage() {
     return { produced, loss, pct };
   }, [productionLogs, consumed]);
 
-  const chartData = [{
-    name: "المياه (م³)",
-    produced: analytics.produced,
-    consumed,
-    loss: analytics.loss,
-  }];
+  const chartData = [
+    {
+      name: "المياه (م³)",
+      produced: analytics.produced,
+      consumed,
+      loss: analytics.loss,
+    },
+  ];
 
   if (!user?.tenantId || user.isSuperAdmin) {
     return (
@@ -202,7 +215,9 @@ function LossAnalysisPage() {
         <Card>
           <CardContent className="p-8 text-center">
             <h1 className="font-bold">لا يوجد مشروع تشغيلي مرتبط بالحساب</h1>
-            <p className="mt-2 text-sm text-muted-foreground">لا يتم عرض بيانات اصطناعية أو بيانات مشروع آخر.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              لا يتم عرض بيانات اصطناعية أو بيانات مشروع آخر.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -213,32 +228,60 @@ function LossAnalysisPage() {
     <div dir="rtl" className="space-y-6 pb-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <Badge variant="outline" className="mb-2">بيانات قاعدة البيانات</Badge>
+          <Badge variant="outline" className="mb-2">
+            بيانات قاعدة البيانات
+          </Badge>
           <h1 className="text-2xl md:text-3xl font-bold">تحليل فاقد المياه والتسرب</h1>
-          <p className="text-sm text-muted-foreground mt-1">الفرق بين مدخل المياه المعتمد والاستهلاك المعتمد للمشروع الحالي.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            الفرق بين مدخل المياه المعتمد والاستهلاك المعتمد للمشروع الحالي.
+          </p>
         </div>
         <Button variant="outline" onClick={() => void loadData()} disabled={loading || saving}>
           <RefreshCw className={`h-4 w-4 ms-1 ${loading ? "animate-spin" : ""}`} /> تحديث
         </Button>
       </div>
 
-      {error && <div className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">تسجيل مدخل مياه جديد</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">تسجيل مدخل مياه جديد</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <div>
               <Label>مصدر القياس</Label>
-              <Input value={sourceName} onChange={(e) => setSourceName(e.target.value)} placeholder="مثال: عداد الإنتاج الرئيسي" disabled={saving} />
+              <Input
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                placeholder="مثال: عداد الإنتاج الرئيسي"
+                disabled={saving}
+              />
             </div>
             <div>
               <Label>حجم الإنتاج/الضخ (م³)</Label>
-              <Input type="number" min="0" step="0.001" value={units} onChange={(e) => setUnits(e.target.value)} placeholder="مثال: 12500" disabled={saving} />
+              <Input
+                type="number"
+                min="0"
+                step="0.001"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                placeholder="مثال: 12500"
+                disabled={saving}
+              />
             </div>
             <div>
               <Label>ملاحظة</Label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مصدر القياس أو ملاحظة التشغيل" disabled={saving} />
+              <Input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="مصدر القياس أو ملاحظة التشغيل"
+                disabled={saving}
+              />
             </div>
             <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
               لا يتم تخزين صورة أو Data URL لأن جدول سجلات الإنتاج الحالي لا يحتوي حقلاً للصورة.
@@ -250,27 +293,59 @@ function LossAnalysisPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">فلترة الفترة</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">فلترة الفترة</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>من تاريخ</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div><Label>إلى تاريخ</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div>
+                <Label>من تاريخ</Label>
+                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              </div>
+              <div>
+                <Label>إلى تاريخ</Label>
+                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              </div>
             </div>
             <div className="pt-2">
-              <LossStat label="فاقد المياه" pct={analytics.pct} loss={analytics.loss} unit="م³" icon={<Droplets className="w-4 h-4" />} />
+              <LossStat
+                label="فاقد المياه"
+                pct={analytics.pct}
+                loss={analytics.loss}
+                unit="م³"
+                icon={<Droplets className="w-4 h-4" />}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
-              <div>مدخل معتمد: <span className="font-semibold text-foreground">{fmtNum(analytics.produced)} م³</span></div>
-              <div>استهلاك معتمد: <span className="font-semibold text-foreground">{fmtNum(consumed)} م³</span></div>
-              <div>القراءات المعتمدة: <span className="font-semibold text-foreground">{readingCount}</span></div>
-              <div>السجلات المعتمدة: <span className="font-semibold text-foreground">{productionLogs.filter((p) => p.verification_status === "approved").length}</span></div>
+              <div>
+                مدخل معتمد:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtNum(analytics.produced)} م³
+                </span>
+              </div>
+              <div>
+                استهلاك معتمد:{" "}
+                <span className="font-semibold text-foreground">{fmtNum(consumed)} م³</span>
+              </div>
+              <div>
+                القراءات المعتمدة:{" "}
+                <span className="font-semibold text-foreground">{readingCount}</span>
+              </div>
+              <div>
+                السجلات المعتمدة:{" "}
+                <span className="font-semibold text-foreground">
+                  {productionLogs.filter((p) => p.verification_status === "approved").length}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">مدخل المياه مقابل الاستهلاك والفاقد</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">مدخل المياه مقابل الاستهلاك والفاقد</CardTitle>
+        </CardHeader>
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
@@ -293,44 +368,86 @@ function LossAnalysisPage() {
             <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div className="text-sm">
               <div className="font-semibold">تنبيه — نسبة الفاقد تتجاوز العتبة التشغيلية</div>
-              <div className="text-muted-foreground mt-1">الفاقد الحسابي {analytics.pct.toFixed(1)}%. يجب تفسيره ميدانياً قبل اعتباره تسرباً أو فقداً فنياً.</div>
+              <div className="text-muted-foreground mt-1">
+                الفاقد الحسابي {analytics.pct.toFixed(1)}%. يجب تفسيره ميدانياً قبل اعتباره تسرباً
+                أو فقداً فنياً.
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader><CardTitle className="text-base">سجلات مدخل المياه</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">سجلات مدخل المياه</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2">
-          {loading ? <p className="text-sm text-muted-foreground text-center py-6">جارٍ تحميل البيانات…</p> : productionLogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">لا توجد سجلات إنتاج في الفترة المحددة.</p>
-          ) : productionLogs.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg">
-              <div className="w-10 h-10 bg-muted rounded grid place-items-center"><TrendingDown className="w-4 h-4 text-muted-foreground" /></div>
-              <div className="flex-1 text-sm">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant={p.verification_status === "approved" ? "default" : "outline"}>{p.verification_status === "approved" ? "معتمد" : p.verification_status === "pending" ? "معلّق" : "مرفوض"}</Badge>
-                  <span className="font-semibold">{fmtNum(Number(p.production_m3 ?? 0))} م³</span>
-                  <span className="text-xs text-muted-foreground">{p.source_name}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(p.recorded_at).toLocaleString("ar-YE")}</span>
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">جارٍ تحميل البيانات…</p>
+          ) : productionLogs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              لا توجد سجلات إنتاج في الفترة المحددة.
+            </p>
+          ) : (
+            productionLogs.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                <div className="w-10 h-10 bg-muted rounded grid place-items-center">
+                  <TrendingDown className="w-4 h-4 text-muted-foreground" />
                 </div>
-                {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
+                <div className="flex-1 text-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={p.verification_status === "approved" ? "default" : "outline"}>
+                      {p.verification_status === "approved"
+                        ? "معتمد"
+                        : p.verification_status === "pending"
+                          ? "معلّق"
+                          : "مرفوض"}
+                    </Badge>
+                    <span className="font-semibold">{fmtNum(Number(p.production_m3 ?? 0))} م³</span>
+                    <span className="text-xs text-muted-foreground">{p.source_name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(p.recorded_at).toLocaleString("ar-YE")}
+                    </span>
+                  </div>
+                  {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function LossStat({ label, pct, loss, unit, icon }: { label: string; pct: number; loss: number; unit: string; icon: React.ReactNode }) {
+function LossStat({
+  label,
+  pct,
+  loss,
+  unit,
+  icon,
+}: {
+  label: string;
+  pct: number;
+  loss: number;
+  unit: string;
+  icon: React.ReactNode;
+}) {
   const danger = pct > LOSS_THRESHOLD;
   return (
-    <div className={`p-3 rounded-lg border ${danger ? "border-destructive/40 bg-destructive/5" : "bg-muted/30"}`}>
-      <div className="text-xs text-muted-foreground flex items-center gap-1">{icon}{label}</div>
-      <div className={`text-xl font-bold mt-1 ${danger ? "text-destructive" : ""}`}>{pct.toFixed(1)}%</div>
-      <div className="text-[11px] text-muted-foreground">{fmtNum(loss)} {unit}</div>
+    <div
+      className={`p-3 rounded-lg border ${danger ? "border-destructive/40 bg-destructive/5" : "bg-muted/30"}`}
+    >
+      <div className="text-xs text-muted-foreground flex items-center gap-1">
+        {icon}
+        {label}
+      </div>
+      <div className={`text-xl font-bold mt-1 ${danger ? "text-destructive" : ""}`}>
+        {pct.toFixed(1)}%
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        {fmtNum(loss)} {unit}
+      </div>
     </div>
   );
 }
