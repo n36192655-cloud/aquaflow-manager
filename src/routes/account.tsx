@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 export const Route = createFileRoute("/account")({ head: () => ({ meta: [{ title: "حسابي — منصة ميزان" }] }), component: AccountPage });
 
 function AccountPage() {
+  const navigate = useNavigate();
   const { user, changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +42,8 @@ function AccountPage() {
       const ok = await changePassword(currentPassword, password);
       if (!ok) return toast.error("تعذر تغيير كلمة المرور");
       setCurrentPassword(""); setPassword(""); setConfirm("");
-      toast.success("تم تغيير كلمة المرور بنجاح");
+      toast.success("تم تغيير كلمة المرور بنجاح. تم تسجيل الخروج من الجلسات السابقة، سجّل الدخول مجدداً.");
+      navigate({ to: "/login", replace: true });
     } finally { setBusy(false); }
   }
 
