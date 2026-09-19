@@ -416,6 +416,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_initial_password_change: { Args: never; Returns: undefined }
       current_tenant_id: { Args: never; Returns: string }
       has_role: {
         Args: {
