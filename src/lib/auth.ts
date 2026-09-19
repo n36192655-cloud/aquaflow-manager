@@ -26,7 +26,7 @@ interface AuthState {
 }
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       loginError: null,
       login: async (username, password) => {
@@ -51,8 +51,8 @@ export const useAuth = create<AuthState>()(
             set({ loginError: "bad_credentials" });
             return false;
           }
-          await useAuth.getState().hydrateFromSupabase();
-          const u = useAuth.getState().user;
+          await get().hydrateFromSupabase();
+          const u = get().user;
           if (!u) {
             set({ loginError: "bad_credentials" });
             return false;
@@ -103,13 +103,13 @@ export const useAuth = create<AuthState>()(
         // A password change is a credential-security event: revoke refresh-token
         // sessions on every device and force a fresh login.
         await supabase.auth.signOut({ scope: "global" });
-        const current = useAuth.getState().user;
+        const current = get().user;
         if (current?.seatId) useLicense.getState().releaseSeat(current.seatId);
         set({ user: null, loginError: null });
         return true;
       },
       logout: () => {
-        const u = useAuth.getState().user;
+        const u = get().user;
         if (u?.seatId) useLicense.getState().releaseSeat(u.seatId);
         void supabase.auth.signOut({ scope: "local" });
         set({ user: null, loginError: null });
@@ -166,7 +166,7 @@ export const useAuth = create<AuthState>()(
         });
       },
       heartbeat: () => {
-        const u = useAuth.getState().user;
+        const u = get().user;
         if (u?.seatId) useLicense.getState().touchSeat(u.seatId);
       },
     }),
