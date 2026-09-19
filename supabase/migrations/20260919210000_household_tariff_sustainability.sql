@@ -325,7 +325,7 @@ BEGIN
     NEW.tenant_id,
     NEW.customer_id,
     wr.consumption,
-    GREATEST(1, EXTRACT(DAY FROM (NEW.issued_at::date - COALESCE(lagged.issued_date, NEW.issued_at::date)))::INTEGER),
+    GREATEST(1, COALESCE(EXTRACT(DAY FROM (NEW.issued_at::date - lagged.issued_date))::INTEGER, 30)),
     NEW.issued_at::date
   )
   INTO v_charge
