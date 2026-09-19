@@ -16,6 +16,7 @@ export interface FieldReadingInput {
 
 const MAX_METER_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_METER_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const IMAGE_EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 function dataUrlToBlob(dataUrl: string): Blob {
   if (!dataUrl.startsWith("data:")) throw new Error("Invalid image data");
@@ -40,7 +41,8 @@ function dataUrlToBlob(dataUrl: string): Blob {
 
 export async function uploadMeterReadingImage(dataUrl: string, tenantId: string, userId: string, clientId: string): Promise<string> {
   const blob = dataUrlToBlob(dataUrl);
-  const path = `${tenantId}/${userId}/${clientId}.jpg`;
+  const extension = IMAGE_EXTENSIONS[blob.type] ?? "jpg";
+  const path = `${tenantId}/${userId}/${clientId}.${extension}`;
   const { error } = await supabase.storage.from("meter-readings").upload(path, blob, {
     contentType: blob.type,
     upsert: false,
