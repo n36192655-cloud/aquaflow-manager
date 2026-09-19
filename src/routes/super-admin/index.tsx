@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
-import { provisionTenantUsers } from "@/lib/account.functions";
+import { provisionTenantUsers, resetTenantUserPassword } from "@/lib/account.functions";
 import { toast } from "sonner";
 import { ShieldCheck, RefreshCw, LogOut, Network, Plus } from "lucide-react";
 
@@ -13,6 +13,8 @@ export const Route = createFileRoute("/super-admin/")({
   head: () => ({ meta: [{ title: "لوحة الإشراف المركزي — ميزان" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: SuperAdminDashboard,
 });
+
+type TenantUser = { userId: string; username: string; displayName: string; role: "manager" | "collector" | "reader"; mustChangePassword: boolean; };
 
 type TenantRow = {
   id: string; name: string; project_name: string | null; tenant_type: "project" | "central";
@@ -29,6 +31,7 @@ function SuperAdminDashboard() {
   const [centralName, setCentralName] = useState("الإشراف المركزي — ميزان");
   const [provisioningTenantId, setProvisioningTenantId] = useState<string | null>(null);
   const [credentialSets, setCredentialSets] = useState<Record<string, Array<{ username: string; password: string; role: string; displayName: string }>>>({});
+  const [tenantUsers, setTenantUsers] = useState<Record<string, TenantUser[]>>({});
 
   useEffect(() => {
     void (async () => {
@@ -46,8 +49,22 @@ function SuperAdminDashboard() {
     setLoading(true);
     const { data, error } = await supabase.from("tenants").select("id,name,project_name,tenant_type,parent_tenant_id,subscription_status,subscription_expires_at").order("created_at", { ascending: true });
     setLoading(false);
-    if (error) { toast.error("تعذّر جلب المشاريع"); return; }
+    if (error) { toast.error("تعذّر جلب المستأجرين"); return; }
     setTenants((data ?? []) as TenantRow[]);
+    const tenantIds = (data ?? []).map((t) => t.id);
+    if (!tenantIds.length) { setTenantUsers({}); return; }
+    const [{ data: roles }, { data: profiles }] = await Promise.all([
+      supabase.from("user_roles").select("user_id,tenant_id,role,must_change_password").in("tenant_id", tenantIds),
+      supabase.from("profiles").select("id,tenant_id,username,display_name").in("tenant_id", tenantIds),
+    ]);
+    const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const grouped: Record<string, TenantUser[]> = {};
+    for (const role of roles ?? []) {
+      const profile = profileMap.get(role.user_id);
+      if (!profile || !role.tenant_id || !["manager","collector","reader"].includes(role.role)) continue;
+      (grouped[role.tenant_id] ??= []).push({ userId: role.user_id, username: profile.username ?? "غير معيّن", displayName: profile.display_name ?? "مستخدم", role: role.role as TenantUser["role"], mustChangePassword: role.must_change_password === true });
+    }
+    setTenantUsers(grouped);
   }
 
   async function createCentral() {
@@ -91,6 +108,17 @@ function SuperAdminDashboard() {
     } finally { setProvisioningTenantId(null); }
   }
 
+  async function resetPassword(t: TenantRow, user: TenantUser) {
+    try {
+      const result = await resetTenantUserPassword({ data: { tenantId: t.id, userId: user.userId } });
+      setCredentialSets((prev) => ({ ...prev, [t.id]: [{ username: result.username, password: result.password, role: result.role, displayName: user.displayName }] }));
+      toast.success("تم إصدار كلمة مرور مؤقتة جديدة؛ ستظهر الآن فقط.");
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر إعادة ضبط كلمة المرور");
+    }
+  }
+
   async function setStatus(t: TenantRow) {
     const next = t.subscription_status === "active" ? "suspended" : "active";
     const { error } = await supabase.rpc("set_tenant_subscription_status", { p_tenant_id: t.id, p_status: next });
@@ -117,7 +145,7 @@ function SuperAdminDashboard() {
 
       <Card><CardHeader><CardTitle>إنشاء مشروع مياه</CardTitle></CardHeader><CardContent className="flex gap-2"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: مشروع مياه المعافر" /><Button onClick={() => void createProject()} disabled={!central || !name.trim()}>إنشاء وربط</Button></CardContent></Card>
 
-      <Card><CardHeader><CardTitle>المشاريع ({projects.length})</CardTitle></CardHeader><CardContent className="space-y-2">{projects.map((t) => <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted-foreground">المستأجر المركزي: {t.parent_tenant_id ? "مرتبط" : "غير مرتبط"}</div><div className="text-xs text-muted-foreground">ينتهي: {t.subscription_expires_at ? new Date(t.subscription_expires_at).toLocaleDateString("ar-YE") : "غير محدّد"}</div></div><div className="flex items-center gap-2"><Badge variant={t.subscription_status === "active" ? "default" : "destructive"}>{t.subscription_status === "active" ? "نشط" : t.subscription_status === "suspended" ? "موقوف" : "منتهي"}</Badge><Button size="sm" variant="outline" disabled={t.subscription_status !== "active" || provisioningTenantId === t.id} onClick={() => void provisionUsers(t)}>{provisioningTenantId === t.id ? "جارٍ إنشاء الحسابات…" : "إنشاء حسابات المشروع"}</Button><Button size="sm" variant="outline" onClick={() => void setStatus(t)}>{t.subscription_status === "active" ? "تعليق" : "تفعيل"}</Button></div>
+      <Card><CardHeader><CardTitle>المشاريع ({projects.length})</CardTitle></CardHeader><CardContent className="space-y-2">{projects.map((t) => <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div><div className="font-semibold">{t.name}</div><div className="text-xs text-muted-foreground">المستأجر المركزي: {t.parent_tenant_id ? "مرتبط" : "غير مرتبط"}</div><div className="text-xs text-muted-foreground">ينتهي: {t.subscription_expires_at ? new Date(t.subscription_expires_at).toLocaleDateString("ar-YE") : "غير محدّد"}</div></div><div className="flex items-center gap-2"><Badge variant={t.subscription_status === "active" ? "default" : "destructive"}>{t.subscription_status === "active" ? "نشط" : t.subscription_status === "suspended" ? "موقوف" : "منتهي"}</Badge><Button size="sm" variant="outline" disabled={t.subscription_status !== "active" || provisioningTenantId === t.id} onClick={() => void provisionUsers(t)}>{provisioningTenantId === t.id ? "جارٍ إنشاء الحسابات…" : "إنشاء الحسابات الناقصة"}</Button><Button size="sm" variant="outline" onClick={() => void setStatus(t)}>{t.subscription_status === "active" ? "تعليق" : "تفعيل"}</Button></div><div className="mt-3 grid gap-2 md:grid-cols-3">{(tenantUsers[t.id] ?? []).map((u) => <div key={u.userId} className="rounded-md border p-3 text-sm"><div className="font-semibold">{u.displayName}</div><div dir="ltr" className="mt-1 font-mono text-xs">{u.username}</div><div className="mt-1 text-xs text-muted-foreground">{u.mustChangePassword ? "كلمة مرور مؤقتة — يجب تغييرها" : "حساب مفعّل"}</div><Button size="sm" variant="outline" className="mt-2 w-full" onClick={() => void resetPassword(t, u)}>إعادة ضبط كلمة المرور</Button></div>)}</div>
 {credentialSets[t.id]?.length > 0 && <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2"><div className="font-semibold text-sm">بيانات الحسابات الجديدة — تُعرض مرة واحدة</div><div className="text-xs text-muted-foreground">لا تُحفظ كلمات المرور في قاعدة بيانات ميزان ولا يمكن استرجاعها لاحقاً. سلّمها للعميل ثم اطلب منه إضافة بريد استرداد من صفحة «حسابي».</div>{credentialSets[t.id].map((u) => <div key={u.username} className="grid gap-1 rounded border bg-background p-2 text-sm"><div><span className="text-muted-foreground">الدور: </span>{u.displayName}</div><div dir="ltr" className="font-mono"><span className="text-muted-foreground">username: </span>{u.username}</div><div dir="ltr" className="font-mono"><span className="text-muted-foreground">password: </span>{u.password}</div></div>)}</div>}
 </div>)}{projects.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">لا توجد مشاريع.</p>}</CardContent></Card>
 
