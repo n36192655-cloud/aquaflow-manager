@@ -111,7 +111,7 @@ BEGIN
       RAISE EXCEPTION 'Reading has more decimal places than the meter profile permits';
     END IF;
     IF v_integer_digits > 0 THEN
-      v_integer_length := length(abs(trunc(p_current))::bigint::text);
+      v_integer_length := length(trunc(abs(p_current))::text);
       IF v_integer_length > v_integer_digits THEN
         RAISE EXCEPTION 'Reading exceeds the integer digit capacity of the meter profile';
       END IF;
