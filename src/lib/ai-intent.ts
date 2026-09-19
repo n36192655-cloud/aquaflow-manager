@@ -82,20 +82,35 @@ async function subscriberLedger(tenantId: string, text: string): Promise<AiRespo
   if (error) return genericDataError();
 
   const customers = [...(byName.data ?? []), ...(byPhone.data ?? []), ...(byAccount.data ?? [])];
-  const customer = customers.find((item, index, all) => all.findIndex((x) => x.id === item.id) === index);
-  if (!customer) {
+  const uniqueCustomers = customers.filter((item, index, all) => all.findIndex((x) => x.id === item.id) === index);
+  if (uniqueCustomers.length === 0) {
     return { kind: "suggestions", text: "لم أجد مشتركاً مطابقاً في قاعدة البيانات الحالية. لم يتم اختراع نتيجة.", suggestions: SUGGESTIONS };
   }
+  if (uniqueCustomers.length > 1) {
+    return {
+      kind: "suggestions",
+      text: "وجدت أكثر من مشترك مطابق. استخدم الاسم الكامل أو رقم الهاتف/حساب السداد لتحديد السجل بدقة.",
+      suggestions: uniqueCustomers.slice(0, 6).map((item) => `استعلام عن مشترك ${item.name}`),
+    };
+  }
+  const customer = uniqueCustomers[0];
 
-  const [billsResult, paymentsResult] = await Promise.all([
-    supabase.from("water_bills").select("id,reading_id,total,status,issued_at").eq("tenant_id", tenantId).eq("customer_id", customer.id).order("issued_at", { ascending: true }),
-    supabase.from("payments").select("id,bill_id,amount,status,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: true }),
-  ]);
-  if (billsResult.error || paymentsResult.error) return genericDataError();
+  const billsResult = await supabase
+    .from("water_bills")
+    .select("id,reading_id,total,status,issued_at")
+    .eq("tenant_id", tenantId)
+    .eq("customer_id", customer.id)
+    .order("issued_at", { ascending: true });
+  if (billsResult.error) return genericDataError();
 
   const bills = billsResult.data ?? [];
-  const billIds = new Set(bills.map((b) => b.id));
-  const payments = (paymentsResult.data ?? []).filter((p) => billIds.has(p.bill_id));
+  const billIds = bills.map((b) => b.id);
+  const paymentsResult = billIds.length
+    ? await supabase.from("payments").select("id,bill_id,amount,status,created_at").eq("tenant_id", tenantId).in("bill_id", billIds).order("created_at", { ascending: true })
+    : { data: [], error: null };
+  if (paymentsResult.error) return genericDataError();
+
+  const payments = paymentsResult.data ?? [];
   const paidByBill = new Map<string, number>();
   for (const payment of payments) {
     if (payment.status === "approved") paidByBill.set(payment.bill_id, (paidByBill.get(payment.bill_id) ?? 0) + Number(payment.amount));
