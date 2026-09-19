@@ -103,7 +103,8 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
     if (!accessToken) throw new Error("Unauthorized");
 
     const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
-    const { data: tenant, error: tenantError } = await admin
+    const userClient = createUserSupabaseClient(accessToken);
+    const { data: tenant, error: tenantError } = await userClient
       .from("tenants")
       .select("id,name,tenant_type,subscription_status")
       .eq("id", data.tenantId)
@@ -154,7 +155,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
         }
         createdUserIds.push(createdAuth.user.id);
 
-        const { error: linkError } = await admin.rpc("provision_tenant_user", {
+        const { error: linkError } = await userClient.rpc("provision_tenant_user", {
           p_actor_user_id: actorId,
           p_user_id: createdAuth.user.id,
           p_tenant_id: data.tenantId,
