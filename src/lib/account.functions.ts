@@ -109,8 +109,8 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
       .select("id,name,tenant_type,subscription_status")
       .eq("id", data.tenantId)
       .maybeSingle();
-    if (tenantError || !tenant || tenant.tenant_type !== "project") throw new Error("Invalid project");
-    if (tenant.subscription_status !== "active") throw new Error("Project is not active");
+    if (tenantError || !tenant || !["project", "central"].includes(tenant.tenant_type)) throw new Error("Invalid tenant");
+    if (tenant.subscription_status !== "active") throw new Error("Tenant is not active");
 
     const roles = [
       { role: "manager" as const, displayName: "مدير المشروع" },
