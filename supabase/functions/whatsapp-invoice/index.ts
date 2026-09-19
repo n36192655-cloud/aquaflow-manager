@@ -44,7 +44,11 @@ export default {
       return json(400, { error: "invalid_json" });
     }
 
-    if (payload.schema !== "public" || payload.table !== "whatsapp_invoice_outbox" || payload.type !== "INSERT") {
+    if (
+      payload.schema !== "public" ||
+      payload.table !== "whatsapp_invoice_outbox" ||
+      payload.type !== "INSERT"
+    ) {
       return json(400, { error: "invalid_webhook_event" });
     }
 
@@ -61,43 +65,54 @@ export default {
     if (!job) return json(404, { error: "outbox_not_found_or_not_claimable" });
     if (job.status === "sent") return json(200, { ok: true, status: "already_sent" });
 
-    const response = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: job.phone,
-        type: "template",
-        template: {
-          name: TEMPLATE_NAME,
-          language: { code: TEMPLATE_LANGUAGE },
-          components: [
-            {
-              type: "body",
-              parameters: [
-                { type: "text", text: job.customer_name || "عميلنا الكريم" },
-                { type: "text", text: job.bill_id },
-                { type: "text", text: Number(job.total).toFixed(2) },
-                { type: "text", text: new Date(job.issued_at).toLocaleDateString("ar-YE") },
-              ],
-            },
-          ],
+    const response = await fetch(
+      `https://graph.facebook.com/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: job.phone,
+          type: "template",
+          template: {
+            name: TEMPLATE_NAME,
+            language: { code: TEMPLATE_LANGUAGE },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: job.customer_name || "عميلنا الكريم" },
+                  { type: "text", text: job.bill_id },
+                  { type: "text", text: Number(job.total).toFixed(2) },
+                  { type: "text", text: new Date(job.issued_at).toLocaleDateString("ar-YE") },
+                ],
+              },
+            ],
+          },
+        }),
+      },
+    );
 
     const responseText = await response.text();
     let responseJson: Record<string, unknown> = {};
-    try { responseJson = JSON.parse(responseText); } catch { /* raw response is stored as an error message */ }
+    try {
+      responseJson = JSON.parse(responseText);
+    } catch {
+      /* raw response is stored as an error message */
+    }
 
     if (!response.ok) {
-      const errorMessage = typeof responseJson.error === "object" && responseJson.error !== null
-        ? String((responseJson.error as { message?: unknown }).message ?? responseText).slice(0, 1000)
-        : responseText.slice(0, 1000);
+      const errorMessage =
+        typeof responseJson.error === "object" && responseJson.error !== null
+          ? String((responseJson.error as { message?: unknown }).message ?? responseText).slice(
+              0,
+              1000,
+            )
+          : responseText.slice(0, 1000);
       await ctx.supabase.rpc("complete_whatsapp_invoice", {
         p_outbox_id: outboxId,
         p_webhook_secret: WEBHOOK_SECRET,
