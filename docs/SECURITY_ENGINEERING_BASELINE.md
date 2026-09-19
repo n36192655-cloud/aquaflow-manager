@@ -17,6 +17,10 @@ The working team is organized as role-based review gates:
 7. **QA/reliability engineer** — regression, negative testing, authorization tests, deployment verification and failure-path testing.
 8. **DevSecOps/release engineer** — dependency/supply-chain controls, environment separation, deployment verification and operational monitoring.
 
+9. **Water-services domain expert** — validates meter-reading semantics, meter technologies (mechanical/dial/multicolor), consumption calculations, field procedures, water-loss signals, and operational correctness in Yemeni water-service contexts.
+10. **Sustainable-development expert** — aligns operational and analytical features with water-service continuity, resource efficiency, financial sustainability, service equity, and measurable sustainability indicators; prevents dashboards from presenting unsupported sustainability claims.
+11. **Governance / internal-controls expert** — reviews segregation of duties, approval workflows, accountability, audit evidence, data ownership, policy enforcement, exception handling, and governance controls across tenants and central administration.
+
 ## Security baseline
 Mizan development follows:
 - OWASP ASVS 5.0.0 as the application verification baseline.
