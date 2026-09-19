@@ -66,6 +66,7 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          household_size: number
         }
         Insert: {
           address?: string | null
@@ -88,6 +89,7 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          household_size?: number
         }
         Relationships: [
           {
@@ -256,6 +258,10 @@ export type Database = {
           subtotal: number
           tenant_id: string
           total: number
+          tariff_plan_id: string | null
+          tariff_category: string | null
+          consumption_lpd: number | null
+          tariff_breakdown: Json
         }
         Insert: {
           arrears?: number
@@ -280,6 +286,10 @@ export type Database = {
           subtotal?: number
           tenant_id?: string
           total?: number
+          tariff_plan_id?: string | null
+          tariff_category?: string | null
+          consumption_lpd?: number | null
+          tariff_breakdown?: Json
         }
         Relationships: [
           {
