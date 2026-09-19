@@ -181,6 +181,46 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
     return { tenantId: data.tenantId, credentials: created };
   });
 
+export const resetTenantUserPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ tenantId: z.string().uuid(), userId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const accessToken = getRequestHeader("authorization")?.replace(/^Bearer\\s+/i, "").trim();
+    if (!accessToken) throw new Error("Unauthorized");
+
+    const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
+    const userClient = createUserSupabaseClient(accessToken);
+    const { data: membership, error: membershipError } = await userClient
+      .from("user_roles")
+      .select("user_id, tenant_id, role")
+      .eq("tenant_id", data.tenantId)
+      .eq("user_id", data.userId)
+      .in("role", ["manager", "collector", "reader"])
+      .maybeSingle();
+    if (membershipError || !membership) throw new Error("Invalid tenant user");
+
+    const password = generateInitialPassword();
+    const { error: updateError } = await admin.auth.admin.updateUserById(data.userId, { password });
+    if (updateError) throw new Error("Password reset failed");
+
+    const { error: roleError } = await userClient
+      .from("user_roles")
+      .update({ must_change_password: true })
+      .eq("tenant_id", data.tenantId)
+      .eq("user_id", data.userId);
+    if (roleError) throw new Error("Password reset lifecycle update failed");
+
+    await userClient.from("audit_logs").insert({
+      tenant_id: data.tenantId,
+      user_id: actorId,
+      action: "user.password_reset",
+      entity: "auth_user",
+      entity_id: data.userId,
+      meta: { role: membership.role, temporary_password_issued: true },
+    });
+
+    return { tenantId: data.tenantId, userId: data.userId, username: "", password, role: membership.role };
+  });
+
 export const requestPasswordReset = createServerFn({ method: "POST" })
   .validator(z.object({ username: z.string().trim().min(1).max(80) }))
   .handler(async ({ data }) => {
