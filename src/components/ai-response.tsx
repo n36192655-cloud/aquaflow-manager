@@ -43,7 +43,7 @@ export function AiResponseRenderer({ response, onSuggestion }: Props) {
               <div className="text-sm font-bold flex items-center gap-1.5"><User className="w-4 h-4 text-primary" /> {customer.name}</div>
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
                 <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" /> <span dir="ltr">{customer.phone}</span></span>
-                {customer.directorate && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {customer.directorate}</span>}
+                {customer.address && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {customer.address}</span>}
               </div>
               <div className="text-[10px] font-mono text-muted-foreground mt-1" dir="ltr">{customer.pay_account}</div>
             </div>
