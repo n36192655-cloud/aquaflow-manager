@@ -54,17 +54,18 @@ function AssistantPage() {
     setMessages((m) => [...m, { role: "assistant", response }]);
   }
 
-  function refresh() {
-    const { synced } = syncPending();
+  async function refresh() {
+    const { synced } = await syncPending();
     setRefreshKey((k) => k + 1);
     // Re-run the last user question to refresh the last card
     const lastUser = [...messages].reverse().find((m) => m.role === "user") as UserMsg | undefined;
     if (lastUser) {
-      const response = answerQuestion(lastUser.text);
+      void answerQuestion(lastUser.text).then((response) => {
       setMessages((m) => {
         const last = m[m.length - 1];
         if (last && last.role === "assistant") return [...m.slice(0, -1), { role: "assistant", response }];
         return [...m, { role: "assistant", response }];
+      });
       });
     }
     toast.success(synced > 0 ? `تمت مزامنة ${synced} إدخال معلّق` : "تم التحديث");
@@ -86,7 +87,7 @@ function AssistantPage() {
           <CardTitle className="text-sm flex items-center gap-2">
             <MizanAiIcon size={18} /> مستشار ميزان الرقمي
           </CardTitle>
-          <Button size="sm" variant="ghost" onClick={refresh} title="تحديث ومزامنة">
+          <Button size="sm" variant="ghost" onClick={() => void refresh()} title="تحديث ومزامنة">
             <RefreshCw className="w-4 h-4 ms-1" /> تحديث ومزامنة
           </Button>
         </CardHeader>
