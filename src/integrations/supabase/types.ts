@@ -193,6 +193,9 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          project_name: string | null
+          tenant_type: "project" | "central"
+          parent_tenant_id: string | null
           subscription_expires_at: string | null
           subscription_status: Database["public"]["Enums"]["subscription_status"]
           updated_at: string
@@ -201,6 +204,9 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          project_name?: string | null
+          tenant_type?: "project" | "central"
+          parent_tenant_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
@@ -209,6 +215,9 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          project_name?: string | null
+          tenant_type?: "project" | "central"
+          parent_tenant_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: Database["public"]["Enums"]["subscription_status"]
           updated_at?: string
