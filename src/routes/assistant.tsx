@@ -45,15 +45,13 @@ function AssistantPage() {
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [messages]);
 
-  function send(q: string) {
+  async function send(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
     setMessages((m) => [...m, { role: "user", text: trimmed }]);
     setInput("");
-    setTimeout(() => {
-      const response = answerQuestion(trimmed);
-      setMessages((m) => [...m, { role: "assistant", response }]);
-    }, 150);
+    const response = await answerQuestion(trimmed);
+    setMessages((m) => [...m, { role: "assistant", response }]);
   }
 
   function refresh() {
@@ -107,12 +105,12 @@ function AssistantPage() {
         <div className="border-t p-3 space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => send(s)} className="text-xs px-2.5 py-1 rounded-full border hover:bg-primary/10 hover:border-primary/40 transition-colors">
+              <button key={s} onClick={() => void send(s)} className="text-xs px-2.5 py-1 rounded-full border hover:bg-primary/10 hover:border-primary/40 transition-colors">
                 {s}
               </button>
             ))}
           </div>
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(input); }}>
+          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
             <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="اكتب سؤالك بالعربية…" />
             <Button type="submit" size="icon"><Send className="w-4 h-4" /></Button>
           </form>
