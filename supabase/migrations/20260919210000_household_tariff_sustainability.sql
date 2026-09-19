@@ -61,8 +61,8 @@ CREATE POLICY water_tariff_plans_select ON public.water_tariff_plans
 DROP POLICY IF EXISTS water_tariff_plans_manage ON public.water_tariff_plans;
 CREATE POLICY water_tariff_plans_manage ON public.water_tariff_plans
   FOR ALL TO authenticated
-  USING (tenant_id = public.current_tenant_id() AND public.has_tenant_role('manager', tenant_id))
-  WITH CHECK (tenant_id = public.current_tenant_id() AND public.has_tenant_role('manager', tenant_id));
+  USING (tenant_id = public.current_tenant_id() AND public.has_tenant_role(tenant_id, 'manager'::public.app_role))
+  WITH CHECK (tenant_id = public.current_tenant_id() AND public.has_tenant_role(tenant_id, 'manager'::public.app_role));
 
 DROP POLICY IF EXISTS water_tariff_tiers_select ON public.water_tariff_tiers;
 CREATE POLICY water_tariff_tiers_select ON public.water_tariff_tiers
@@ -79,13 +79,13 @@ CREATE POLICY water_tariff_tiers_manage ON public.water_tariff_tiers
     SELECT 1 FROM public.water_tariff_plans p
     WHERE p.id = plan_id
       AND p.tenant_id = public.current_tenant_id()
-      AND public.has_tenant_role('manager', p.tenant_id)
+      AND public.has_tenant_role(p.tenant_id, 'manager'::public.app_role)
   ))
   WITH CHECK (EXISTS (
     SELECT 1 FROM public.water_tariff_plans p
     WHERE p.id = plan_id
       AND p.tenant_id = public.current_tenant_id()
-      AND public.has_tenant_role('manager', p.tenant_id)
+      AND public.has_tenant_role(p.tenant_id, 'manager'::public.app_role)
   ));
 
 REVOKE ALL ON TABLE public.water_tariff_plans FROM anon;
@@ -93,12 +93,14 @@ REVOKE ALL ON TABLE public.water_tariff_tiers FROM anon;
 
 -- Keep the existing four-argument API intact and add a production-safe
 -- five-argument creation path that records household size atomically.
-CREATE OR REPLACE FUNCTION public.create_customer(
+DROP FUNCTION IF EXISTS public.create_customer(TEXT,TEXT,TEXT,TEXT);
+
+CREATE FUNCTION public.create_customer(
   p_name TEXT,
   p_phone TEXT DEFAULT NULL,
   p_address TEXT DEFAULT NULL,
   p_pay_account TEXT DEFAULT NULL,
-  p_household_size INTEGER DEFAULT 1
+  p_household_size INTEGER
 )
 RETURNS public.customers
 LANGUAGE plpgsql
