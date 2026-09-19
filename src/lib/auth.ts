@@ -80,6 +80,28 @@ export const useAuth = create<AuthState>()(persist((set) => ({
   },
   heartbeat: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().touchSeat(u.seatId); },
 }), { name: "mizan-auth-v4" }));
+
+// The persisted Zustand snapshot is only a UI cache. Supabase Auth remains the
+// source of truth and every auth lifecycle event rehydrates the tenant/role state.
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") {
+      const current = useAuth.getState().user;
+      if (current?.seatId) useLicense.getState().releaseSeat(current.seatId);
+      useAuth.setState({ user: null, loginError: null });
+      return;
+    }
+
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      window.setTimeout(() => {
+        void useAuth.getState().hydrateFromSupabase().catch(() => {
+          useAuth.setState({ user: null, loginError: "bad_credentials" });
+        });
+      }, 0);
+    }
+  });
+}
+
 function normalizedUsernameFromAuthEmail(email?: string | null): string | undefined { if (!email) return undefined; const suffix = "@mizan.local"; return email.endsWith(suffix) ? email.slice(0, -suffix.length) : undefined; }
 export const ROLE_LABEL: Record<Role, string> = { admin: "مدير مشروع", reader: "قارئ عدادات", cashier: "محصل" };
 export function canAccess(role: Role | undefined, path: string, isSuperAdmin = false): boolean { if (!role) return false; if (isSuperAdmin) return true; if (role === "admin") return true; if (role === "reader") return path === "/readings" || path === "/account"; if (role === "cashier") return path === "/bills" || path === "/payments" || path === "/account"; return false; }
