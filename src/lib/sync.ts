@@ -27,7 +27,8 @@ export interface PendingReading {
 
 const DB_NAME = "mizan-field-ops-v3";
 const STORE = "pending-readings";
-const VERSION = 1;\nconst MAX_OFFLINE_IMAGE_DATA_URL_CHARS = Math.ceil((5 * 1024 * 1024 * 4) / 3) + 2048;
+const VERSION = 1;
+const MAX_OFFLINE_IMAGE_DATA_URL_CHARS = Math.ceil((5 * 1024 * 1024 * 4) / 3) + 2048;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
