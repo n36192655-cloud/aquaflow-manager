@@ -38,8 +38,30 @@ export const useAuth = create<AuthState>()(persist((set) => ({
   },
   changePassword: async (currentPassword, newPassword) => {
     if (!currentPassword || newPassword.length < 12) return false;
-    const { error } = await supabase.auth.updateUser({ current_password: currentPassword, password: newPassword });
-    return !error;
+
+    // Re-authenticate explicitly before changing the credential. The Supabase
+    // updateUser API accepts the new password; it does not document
+    // current_password as a supported update attribute.
+    const { data: currentUserData, error: currentUserError } = await supabase.auth.getUser();
+    const currentUser = currentUserData.user;
+    if (currentUserError || !currentUser?.email) return false;
+
+    const { data: reauthData, error: reauthError } = await supabase.auth.signInWithPassword({
+      email: currentUser.email,
+      password: currentPassword,
+    });
+    if (reauthError || !reauthData.session) return false;
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) return false;
+
+    // A password change is a credential-security event: revoke refresh-token
+    // sessions on every device and force a fresh login.
+    await supabase.auth.signOut({ scope: "global" });
+    const current = useAuth.getState().user;
+    if (current?.seatId) useLicense.getState().releaseSeat(current.seatId);
+    set({ user: null, loginError: null });
+    return true;
   },
   logout: () => { const u = useAuth.getState().user; if (u?.seatId) useLicense.getState().releaseSeat(u.seatId); void supabase.auth.signOut({ scope: "local" }); set({ user: null, loginError: null }); },
   hydrateFromSupabase: async () => {
