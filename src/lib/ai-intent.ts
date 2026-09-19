@@ -176,7 +176,7 @@ async function lossAnalysis(tenantId: string, text: string): Promise<AiResponse>
 
 async function paymentStatus(tenantId: string): Promise<AiResponse> {
   const [billsResult, customersResult, paymentsResult] = await Promise.all([
-    supabase.from("water_bills").select("id,serial,total,status,customer_id").eq("tenant_id", tenantId).order("issued_at", { ascending: false }).limit(200),
+    supabase.from("water_bills").select("id,reading_id,total,status,customer_id").eq("tenant_id", tenantId).order("issued_at", { ascending: false }).limit(200),
     supabase.from("customers").select("id,name").eq("tenant_id", tenantId),
     supabase.from("payments").select("bill_id,amount,status").eq("tenant_id", tenantId),
   ]);
@@ -190,12 +190,16 @@ async function paymentStatus(tenantId: string): Promise<AiResponse> {
 
   const paid: Array<{ id: string; name: string; serial: string; total: number }> = [];
   const unpaid: Array<{ id: string; name: string; serial: string; total: number; balance: number }> = [];
+  const readingIds = (billsResult.data ?? []).map((b) => b.reading_id).filter((id): id is string => Boolean(id));
+  const readingsResult = readingIds.length ? await supabase.from("water_readings").select("id,meter_number").in("id", readingIds) : { data: [], error: null };
+  if (readingsResult.error) return genericDataError();
+  const meterNumbers = new Map((readingsResult.data ?? []).map((r) => [r.id, r.meter_number]));
   for (const bill of billsResult.data ?? []) {
     const total = Number(bill.total);
     const paidAmount = approvedByBill.get(bill.id) ?? 0;
     const balance = Math.max(0, total - paidAmount);
     const name = customers.get(bill.customer_id) ?? "—";
-    if (balance <= 0 && paidAmount > 0) paid.push({ id: bill.id, name, serial: bill.serial, total });
+    if (balance <= 0 && paidAmount > 0) paid.push({ id: bill.id, name, serial: meterNumbers.get(bill.reading_id ?? "") ?? "—", total });
     else unpaid.push({ id: bill.id, name, serial: bill.serial, total, balance });
   }
   return { kind: "payment_status", paid, unpaid };
