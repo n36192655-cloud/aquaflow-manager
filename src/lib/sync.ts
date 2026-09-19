@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { recordFieldReading } from "./field-ops";
+import { recordFieldReading, uploadMeterReadingImage } from "./field-ops";
 
 export type SyncState = "pending" | "syncing" | "failed";
 
@@ -27,7 +27,7 @@ export interface PendingReading {
 
 const DB_NAME = "mizan-field-ops-v3";
 const STORE = "pending-readings";
-const VERSION = 1;
+const VERSION = 1;\nconst MAX_OFFLINE_IMAGE_DATA_URL_CHARS = Math.ceil((5 * 1024 * 1024 * 4) / 3) + 2048;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -82,6 +82,9 @@ export async function getPending(): Promise<PendingReading[]> { return all(); }
 export async function addPending(
   input: Omit<PendingReading, "clientId" | "createdAt" | "state" | "retryCount"> & { clientId?: string },
 ): Promise<PendingReading> {
+  if (input.imageData && input.imageData.length > MAX_OFFLINE_IMAGE_DATA_URL_CHARS) {
+    throw new Error("Meter image is too large for offline storage");
+  }
   const item: PendingReading = {
     ...input,
     clientId: input.clientId ?? `reading_${crypto.randomUUID()}`,
@@ -99,30 +102,10 @@ export async function removePending(clientId: string) {
   window.dispatchEvent(new Event("mizan-pending-updated"));
 }
 
-function dataUrlToBlob(dataUrl: string): Blob | null {
-  try {
-    const [meta, body] = dataUrl.split(",");
-    if (!meta || !body) return null;
-    const bytes = atob(body);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
-    return new Blob([arr], { type: meta.match(/data:([^;]+)/)?.[1] ?? "image/jpeg" });
-  } catch {
-    return null;
-  }
-}
-
 async function uploadOfflineImage(item: PendingReading): Promise<string | undefined> {
   if (!item.imageData) return undefined;
-  const blob = dataUrlToBlob(item.imageData);
-  if (!blob) throw new Error("Invalid offline image");
-  const path = `${item.tenantId}/${item.userId}/${item.clientId}.jpg`;
-  const { error } = await supabase.storage.from("meter-readings").upload(path, blob, {
-    contentType: blob.type || "image/jpeg",
-    upsert: false,
-  });
-  if (error && !/already exists/i.test(error.message)) throw error;
-  return path;
+  // Reuse the same MIME/size/path validation used by the online field workflow.
+  return uploadMeterReadingImage(item.imageData, item.tenantId, item.userId, item.clientId);
 }
 
 let syncRunning = false;
@@ -157,7 +140,7 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
         synced += 1;
       } catch (e) {
         const retryCount = item.retryCount + 1;
-        await put({ ...item, state: "failed", retryCount, lastError: e instanceof Error ? e.message : "Sync failed" });
+        await put({ ...item, state: "failed", retryCount, lastError: "تعذر مزامنة القراءة؛ ستتم إعادة المحاولة عند توفر الاتصال." });
         failed += 1;
       }
     }
