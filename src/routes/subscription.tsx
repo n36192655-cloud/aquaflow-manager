@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLicense, statusLabel, VENDOR_NAME } from "@/lib/license";
+import { useLicense, statusLabel, VENDOR_NAME, type LicenseStatus } from "@/lib/license";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ function SubscriptionPage() {
   const initIfNeeded = useLicense((s) => s.initIfNeeded);
   const validateRemote = useLicense((s) => s.validateRemote);
   const { user } = useAuth();
-  const [currentStatus, setCurrentStatus] = useState<any>("active");
+  const [currentStatus, setCurrentStatus] = useState<LicenseStatus>("active");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showActivationForm, setShowActivationForm] = useState(false);
   const [formTenantId, setFormTenantId] = useState("");
