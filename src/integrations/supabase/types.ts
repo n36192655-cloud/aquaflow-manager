@@ -848,10 +848,10 @@ export type Database = {
           p_lng?: number | null;
           p_accuracy?: number | null;
         };
-        Returns: any;
+        Returns: { reading_id: string; bill_id: string | null; previous: number; current_reading: number; consumption: number; bill_total: number | null; arrears: number | null; project_name: string | null }[];
       };
-      approve_water_reading: { Args: { p_reading_id: string }; Returns: any };
-      reject_water_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: any };
+      approve_water_reading: { Args: { p_reading_id: string }; Returns: { reading_id: string; bill_id: string | null; status: string }[] };
+      reject_water_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: { reading_id: string; bill_id: string | null; status: string }[] };
       record_water_payment: {
         Args: {
           p_bill_id: string;
@@ -859,10 +859,10 @@ export type Database = {
           p_method: string;
           p_client_id?: string | null;
         };
-        Returns: any;
+        Returns: { payment_id: string; bill_id: string; amount: number; status: string }[];
       };
-      approve_water_payment: { Args: { p_payment_id: string }; Returns: any };
-      reject_water_payment: { Args: { p_payment_id: string; p_reason: string }; Returns: any };
+      approve_water_payment: { Args: { p_payment_id: string }; Returns: { payment_id: string; status: string }[] };
+      reject_water_payment: { Args: { p_payment_id: string; p_reason: string }; Returns: { payment_id: string; status: string }[] };
       record_water_production: {
         Args: {
           p_source_name: string;
@@ -872,15 +872,15 @@ export type Database = {
           p_recorded_at?: string;
           p_client_id?: string | null;
         };
-        Returns: any;
+        Returns: { production_id: string; verification_status: string; client_id: string | null }[];
       };
       simulate_household_water_use: {
         Args: { p_household_size: number; p_consumption_m3: number; p_days?: number };
-        Returns: any;
+        Returns: Json;
       };
       set_tenant_subscription_status: {
         Args: { p_tenant_id: string; p_status: string };
-        Returns: any;
+        Returns: Database["public"]["Tables"]["tenants"]["Row"];
       };
 
       activate_tenant: {
