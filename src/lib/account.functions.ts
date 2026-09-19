@@ -142,7 +142,14 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
           username = generateUsername(tenant.name, item.role);
         }
 
-        const password = generateInitialPassword();
+        const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("username")
+      .eq("id", data.userId)
+      .maybeSingle();
+    if (profileError || !profile?.username) throw new Error("Invalid tenant user");
+
+    const password = generateInitialPassword();
         const syntheticEmail = `${username}@mizan.local`;
         const { data: createdAuth, error: createError } = await admin.auth.admin.createUser({
           email: syntheticEmail,
@@ -218,7 +225,7 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       meta: { role: membership.role, temporary_password_issued: true },
     });
 
-    return { tenantId: data.tenantId, userId: data.userId, username: "", password, role: membership.role };
+    return { tenantId: data.tenantId, userId: data.userId, username: profile.username, password, role: membership.role };
   });
 
 export const requestPasswordReset = createServerFn({ method: "POST" })
