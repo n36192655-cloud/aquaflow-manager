@@ -8,7 +8,20 @@ function isNewSupabaseApiKey(value: string): boolean {
 }
 
 function isSecretSupabaseApiKey(value: string): boolean {
-  return value.startsWith('sb_secret_');
+  return value.startsWith('sb_secret_') || hasServiceRoleJwt(value);
+}
+
+function hasServiceRoleJwt(value: string): boolean {
+  const parts = value.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(parts[1].length / 4) * 4, '=')),
+    ) as { role?: unknown };
+    return payload.role === 'service_role';
+  } catch {
+    return false;
+  }
 }
 
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
