@@ -188,6 +188,12 @@ $$;
 REVOKE ALL ON FUNCTION public.simulate_household_water_use(INTEGER,NUMERIC,INTEGER) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.simulate_household_water_use(INTEGER,NUMERIC,INTEGER) TO authenticated;
 
+ALTER TABLE public.water_bills
+  ADD COLUMN IF NOT EXISTS tariff_plan_id UUID REFERENCES public.water_tariff_plans(id),
+  ADD COLUMN IF NOT EXISTS tariff_category TEXT,
+  ADD COLUMN IF NOT EXISTS consumption_lpd NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS tariff_breakdown JSONB NOT NULL DEFAULT '[]'::jsonb;
+
 CREATE OR REPLACE FUNCTION public.calculate_water_charge(
   p_tenant_id UUID,
   p_customer_id UUID,
@@ -350,6 +356,10 @@ BEGIN
   NEW.subtotal := COALESCE((v_charge ->> 'subtotal')::NUMERIC, 0);
   NEW.arrears := v_arrears;
   NEW.total := NEW.subtotal + NEW.arrears;
+  NEW.tariff_plan_id := (v_charge ->> 'plan_id')::UUID;
+  NEW.tariff_category := v_charge ->> 'category';
+  NEW.consumption_lpd := (v_charge ->> 'litres_per_person_day')::NUMERIC;
+  NEW.tariff_breakdown := COALESCE(v_charge -> 'lines', '[]'::jsonb);
   RETURN NEW;
 END;
 $$;
