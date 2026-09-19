@@ -408,3 +408,108 @@ FOR EACH ROW EXECUTE FUNCTION public.update_water_tariff_updated_at();
 
 REVOKE ALL ON FUNCTION public.update_water_tariff_updated_at() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.update_water_tariff_updated_at() TO service_role;
+
+
+-- Security-invoker KPI view: the caller's RLS/privileges apply to every source table.
+CREATE OR REPLACE VIEW public.monthly_water_service_kpis
+WITH (security_invoker = true)
+AS
+WITH production AS (
+  SELECT tenant_id,
+         date_trunc('month', recorded_at)::date AS month_start,
+         SUM(production_m3) FILTER (WHERE verification_status = 'approved' AND production_m3 > 0) AS system_input_m3
+  FROM public.water_production_logs
+  WHERE tenant_id = public.current_tenant_id()
+  GROUP BY tenant_id, date_trunc('month', recorded_at)
+),
+readings AS (
+  SELECT tenant_id,
+         date_trunc('month', created_at)::date AS month_start,
+         SUM(consumption) FILTER (WHERE verification_status = 'approved' AND status = 'approved' AND consumption >= 0) AS consumption_m3,
+         COUNT(*) AS total_readings,
+         COUNT(*) FILTER (WHERE verification_status = 'approved' AND status = 'approved' AND consumption >= 0) AS approved_readings
+  FROM public.water_readings
+  WHERE tenant_id = public.current_tenant_id()
+  GROUP BY tenant_id, date_trunc('month', created_at)
+),
+billed AS (
+  SELECT b.tenant_id,
+         date_trunc('month', b.issued_at)::date AS month_start,
+         SUM(b.total) AS billed_amount
+  FROM public.water_bills b
+  JOIN public.water_readings r
+    ON r.id = b.reading_id
+   AND r.tenant_id = b.tenant_id
+   AND r.verification_status = 'approved'
+   AND r.status = 'approved'
+  WHERE b.tenant_id = public.current_tenant_id()
+  GROUP BY b.tenant_id, date_trunc('month', b.issued_at)
+),
+collected AS (
+  SELECT p.tenant_id,
+         date_trunc('month', p.created_at)::date AS month_start,
+         SUM(p.amount) AS collected_amount
+  FROM public.payments p
+  JOIN public.water_bills b
+    ON b.id = p.bill_id AND b.tenant_id = p.tenant_id
+  JOIN public.water_readings r
+    ON r.id = b.reading_id
+   AND r.tenant_id = b.tenant_id
+   AND r.verification_status = 'approved'
+   AND r.status = 'approved'
+  WHERE p.tenant_id = public.current_tenant_id()
+    AND p.status = 'approved'
+    AND p.amount >= 0
+  GROUP BY p.tenant_id, date_trunc('month', p.created_at)
+),
+months AS (
+  SELECT tenant_id, month_start FROM production
+  UNION
+  SELECT tenant_id, month_start FROM readings
+  UNION
+  SELECT tenant_id, month_start FROM billed
+  UNION
+  SELECT tenant_id, month_start FROM collected
+)
+SELECT m.tenant_id,
+       m.month_start,
+       COALESCE(pr.system_input_m3, 0)::numeric AS system_input_m3,
+       COALESCE(rd.consumption_m3, 0)::numeric AS consumption_m3,
+       CASE
+         WHEN COALESCE(pr.system_input_m3, 0) > 0
+         THEN (pr.system_input_m3 - COALESCE(rd.consumption_m3, 0))::numeric
+         ELSE NULL
+       END AS nrw_m3,
+       CASE
+         WHEN COALESCE(pr.system_input_m3, 0) > 0
+         THEN ((pr.system_input_m3 - COALESCE(rd.consumption_m3, 0)) / pr.system_input_m3 * 100)::numeric
+         ELSE NULL
+       END AS nrw_pct,
+       CASE
+         WHEN COALESCE(pr.system_input_m3, 0) > 0
+         THEN (COALESCE(rd.consumption_m3, 0) / pr.system_input_m3 * 100)::numeric
+         ELSE NULL
+       END AS water_efficiency_pct,
+       COALESCE(bl.billed_amount, 0)::numeric AS billed_amount,
+       COALESCE(co.collected_amount, 0)::numeric AS collected_amount,
+       CASE
+         WHEN COALESCE(bl.billed_amount, 0) > 0
+         THEN (COALESCE(co.collected_amount, 0) / bl.billed_amount * 100)::numeric
+         ELSE NULL
+       END AS collection_rate_pct,
+       COALESCE(rd.approved_readings, 0)::bigint AS approved_readings,
+       COALESCE(rd.total_readings, 0)::bigint AS total_readings,
+       CASE
+         WHEN COALESCE(rd.total_readings, 0) > 0
+         THEN (rd.approved_readings::numeric / rd.total_readings * 100)
+         ELSE NULL
+       END AS approval_rate_pct
+FROM months m
+LEFT JOIN production pr ON pr.tenant_id = m.tenant_id AND pr.month_start = m.month_start
+LEFT JOIN readings rd ON rd.tenant_id = m.tenant_id AND rd.month_start = m.month_start
+LEFT JOIN billed bl ON bl.tenant_id = m.tenant_id AND bl.month_start = m.month_start
+LEFT JOIN collected co ON co.tenant_id = m.tenant_id AND co.month_start = m.month_start
+ORDER BY m.month_start DESC;
+
+REVOKE ALL ON public.monthly_water_service_kpis FROM PUBLIC, anon;
+GRANT SELECT ON public.monthly_water_service_kpis TO authenticated;
