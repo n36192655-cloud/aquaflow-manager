@@ -122,6 +122,10 @@ export type Database = {
           method?: string
           status?: string
           tenant_id: string
+          tariff_plan_id?: string | null
+          tariff_category?: string | null
+          consumption_lpd?: number | null
+          tariff_breakdown?: Json
         }
         Update: {
           amount?: number
@@ -424,7 +428,27 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_super_admin: { Args: never; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean },
+      central_dashboard_project_metrics: {
+        Args: { p_days?: number }
+        Returns: {
+          tenant_id: string
+          project_name: string
+          subscription_status: string
+          active_customers: number
+          total_readings: number
+          approved_readings: number
+          pending_readings: number
+          rejected_readings: number
+          approved_consumption_m3: number
+          production_input_m3: number | null
+          water_efficiency_pct: number | null
+          metered_balance_gap_pct: number | null
+          billed_amount: number
+          collected_amount: number
+          collection_rate_pct: number | null
+        }[]
+      }
     }
     Enums: {
       app_role: "super_admin" | "manager" | "reader" | "collector"
