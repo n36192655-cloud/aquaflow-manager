@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ClipboardList, Droplets, Gauge, LayoutDashboard, LogOut, Receipt, Scale, ShieldCheck, TrendingDown, UserRound, Users, Wallet } from "lucide-react";
+import { ClipboardList, Droplets, Gauge, LayoutDashboard, LogOut, Receipt, Scale, ShieldCheck, TrendingDown, UserRound, Users, Wallet, Tags } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { canAccess, defaultRouteFor, ROLE_LABEL, useAuth, type Role } from "@/lib/auth";
@@ -18,6 +18,7 @@ const NAV: NavItem[] = [
   { to: "/bills", label: "الفواتير", icon: Receipt, roles: ["admin", "cashier"] },
   { to: "/payments", label: "التحصيل", icon: Wallet, roles: ["admin", "cashier"] },
   { to: "/loss-analysis", label: "تحليل الفاقد", icon: TrendingDown, roles: ["admin"] },
+  { to: "/tariffs", label: "التعرفة الشرائحية", icon: Tags, roles: ["admin"] },
   { to: "/assistant", label: "ميزان الذكي", icon: Scale, roles: ["admin"] },
   { to: "/subscription", label: "الاشتراك", icon: ShieldCheck, roles: ["admin"] },
   { to: "/account", label: "حسابي", icon: UserRound, roles: ["admin", "reader", "cashier"] },
