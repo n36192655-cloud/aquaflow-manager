@@ -35,9 +35,9 @@ export function NetworkStatus() {
               toast.loading("جاري ترحيل ومزامنة القراءات الميدانية...", { id: "sync-toast" });
               
               // عمل تأخير بسيط لإعطاء تجربة بصرية ممتازة أثناء الرفع
-              setTimeout(() => {
+              setTimeout(async () => {
                 try {
-                  const { synced } = syncPending();
+                  const { synced } = await syncPending();
                   if (synced > 0) {
                     toast.success(`تم بنجاح ترحيل ومزامنة ${synced} قراءة إلى السيرفر الرئيسي!`, { id: "sync-toast" });
                   } else {
