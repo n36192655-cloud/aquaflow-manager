@@ -51,6 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (pathname === "/login") return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
+    if (user.mustChangePassword && pathname !== "/account") { navigate({ to: "/account", replace: true }); return; }
     if (pathname === "/subscription") return;
     if (!canAccess(user.role, pathname, user.isSuperAdmin)) navigate({ to: defaultRouteFor(user.role, user.isSuperAdmin), replace: true });
   }, [pathname, user, navigate]);
@@ -61,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!user.isSuperAdmin && remoteLicenseStatus === null && pathname !== "/subscription") return <div className="min-h-screen grid place-items-center bg-background text-foreground"><div className="text-sm text-muted-foreground">جارٍ التحقق من اشتراك المشروع…</div></div>;
   if (!user.isSuperAdmin && remoteLicenseStatus !== "active" && pathname !== "/subscription") return <div className="min-h-screen grid place-items-center bg-background text-foreground"><div className="text-center space-y-2"><div className="text-sm font-semibold">الوصول التشغيلي متوقف</div><div className="text-xs text-muted-foreground">يجب أن يكون اشتراك المشروع نشطاً للوصول إلى بيانات التشغيل.</div></div></div>;
   if (pathname === "/subscription") return <>{children}</>;
+  if (user.mustChangePassword && pathname === "/account") return <>{children}</>;
   if (user.isSuperAdmin && pathname === "/super-admin") return <>{children}</>;
   const nav = NAV.filter((item) => item.roles.includes(user.role));
   const renderNav = (mobile = false) => nav.map((item) => { const active = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to)); const Icon = item.icon; return <Link key={item.to} to={item.to} className={cn(mobile ? "flex flex-col items-center gap-1 py-2 text-[10px]" : "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", active ? "bg-sidebar-accent text-sidebar-primary font-semibold" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}><Icon className="w-4 h-4" /><span>{item.label}</span></Link>; });
