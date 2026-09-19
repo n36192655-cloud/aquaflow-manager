@@ -40,8 +40,8 @@ BEGIN
   IF p_lng IS NOT NULL AND (p_lng < -180 OR p_lng > 180) THEN RAISE EXCEPTION 'Invalid longitude'; END IF;
   IF p_accuracy IS NOT NULL AND p_accuracy < 0 THEN RAISE EXCEPTION 'Invalid GPS accuracy'; END IF;
 
-  SELECT m.customer_id,m.serial_number,mp.integer_digits,mp.decimal_digits
-  INTO v_customer,v_serial,v_integer_digits,v_decimal_digits
+  SELECT m.customer_id,m.serial_number,m.profile_id
+  INTO v_customer,v_serial,v_profile_id
   FROM public.meters m
   JOIN public.meter_profiles mp ON mp.id=m.profile_id AND mp.tenant_id=v_tenant
   WHERE m.id=p_meter_id AND m.tenant_id=v_tenant AND m.status='active';
