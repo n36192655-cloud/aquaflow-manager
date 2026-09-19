@@ -63,5 +63,5 @@ export const useLicense = create<LicenseState>()(persist((set, get) => ({
       return true;
     } catch (err) { console.error("[activateRemote]", err); return false; }
   },
-}), { name: "mizan-cloud-license-v2" }));
+}), {\n  name: "mizan-cloud-license-v2",\n  // License keys are credential-like values and must never be persisted in browser storage.\n  // The key may remain in memory for the active workflow only.\n  partialize: (state) => ({\n    tenantId: state.tenantId,\n    maxSeats: state.maxSeats,\n    expiresAt: state.expiresAt,\n    billingPaid: state.billingPaid,\n    initialized: state.initialized,\n  }),\n}));
 export function statusLabel(s: LicenseStatus): string { switch (s) { case "active": return "الاشتراك نشط"; case "expired": return "انتهت صلاحية الاشتراك"; case "invalid": return "اشتراك غير صالح"; case "seat_limit": return "تم تجاوز عدد الأجهزة المسموح بها"; case "suspended": return "الاشتراك معلّق — يرجى التواصل مع مالك المنصة"; default: return "حالة غير معروفة"; } }
