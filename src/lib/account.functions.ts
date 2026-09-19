@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   createPublicSupabaseClient,
   createSecretSupabaseClient,
+  createUserSupabaseClient,
   generateInitialPassword,
   generateUsername,
   requireSuperAdmin,
@@ -53,6 +54,10 @@ async function authFailure(): Promise<never> {
   throw new Error("bad_credentials");
 }
 
+function bearerToken(): string {
+  return getRequestHeader("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
+}
+
 export const loginWithUsername = createServerFn({ method: "POST" })
   .validator(z.object({
     username: z.string().trim().min(1).max(80),
@@ -67,6 +72,7 @@ export const loginWithUsername = createServerFn({ method: "POST" })
       ipKey === "unknown" ? Promise.resolve(true) : authRateAllowed(secret, "login-ip", ipKey, 30),
     ]);
     if (!usernameAllowed || !ipAllowed) return authFailure();
+
     const { data: profile, error: profileError } = await secret
       .from("profiles")
       .select("id")
@@ -95,21 +101,23 @@ export const loginWithUsername = createServerFn({ method: "POST" })
   });
 
 export const provisionTenantUsers = createServerFn({ method: "POST" })
-  .validator(z.object({
-    tenantId: z.string().uuid(),
-  }))
+  .validator(z.object({ tenantId: z.string().uuid() }))
   .handler(async ({ data }) => {
-    const accessToken = getRequestHeader("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const accessToken = bearerToken();
     if (!accessToken) throw new Error("Unauthorized");
 
     const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
     const userClient = createUserSupabaseClient(accessToken);
+
     const { data: tenant, error: tenantError } = await userClient
       .from("tenants")
       .select("id,name,tenant_type,subscription_status")
       .eq("id", data.tenantId)
       .maybeSingle();
-    if (tenantError || !tenant || !["project", "central"].includes(tenant.tenant_type)) throw new Error("Invalid tenant");
+
+    if (tenantError || !tenant || !["project", "central"].includes(tenant.tenant_type)) {
+      throw new Error("Invalid tenant");
+    }
     if (tenant.subscription_status !== "active") throw new Error("Tenant is not active");
 
     const roles = [
@@ -123,33 +131,31 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
 
     try {
       for (const item of roles) {
-        const { data: existing } = await userClient
+        const { data: existing, error: existingError } = await userClient
           .from("user_roles")
           .select("user_id")
           .eq("tenant_id", data.tenantId)
           .eq("role", item.role)
           .limit(1);
+
+        if (existingError) throw new Error("Unable to inspect tenant users");
         if (existing && existing.length > 0) continue;
 
-        let username = generateUsername(tenant.name, item.role);
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          const { data: conflict } = await userClient
+        let username = "";
+        let conflict = true;
+        for (let attempt = 0; attempt < 8 && conflict; attempt += 1) {
+          username = generateUsername(tenant.name, item.role);
+          const { data: profileConflict, error: conflictError } = await userClient
             .from("profiles")
             .select("id")
             .eq("username", username)
             .maybeSingle();
-          if (!conflict) break;
-          username = generateUsername(tenant.name, item.role);
+          if (conflictError) throw new Error("Unable to validate username");
+          conflict = Boolean(profileConflict);
         }
+        if (conflict) throw new Error("Unable to generate a unique username");
 
-        const { data: profile, error: profileError } = await userClient
-      .from("profiles")
-      .select("username")
-      .eq("id", data.userId)
-      .maybeSingle();
-    if (profileError || !profile?.username) throw new Error("Invalid tenant user");
-
-    const password = generateInitialPassword();
+        const password = generateInitialPassword();
         const syntheticEmail = `${username}@mizan.local`;
         const { data: createdAuth, error: createError } = await admin.auth.admin.createUser({
           email: syntheticEmail,
@@ -191,11 +197,12 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
 export const resetTenantUserPassword = createServerFn({ method: "POST" })
   .validator(z.object({ tenantId: z.string().uuid(), userId: z.string().uuid() }))
   .handler(async ({ data }) => {
-    const accessToken = getRequestHeader("authorization")?.replace(/^Bearer\\s+/i, "").trim();
+    const accessToken = bearerToken();
     if (!accessToken) throw new Error("Unauthorized");
 
     const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
     const userClient = createUserSupabaseClient(accessToken);
+
     const { data: membership, error: membershipError } = await userClient
       .from("user_roles")
       .select("user_id, tenant_id, role")
@@ -204,6 +211,14 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       .in("role", ["manager", "collector", "reader"])
       .maybeSingle();
     if (membershipError || !membership) throw new Error("Invalid tenant user");
+
+    const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("username")
+      .eq("id", data.userId)
+      .eq("tenant_id", data.tenantId)
+      .maybeSingle();
+    if (profileError || !profile?.username) throw new Error("Invalid tenant user");
 
     const password = generateInitialPassword();
     const { error: updateError } = await admin.auth.admin.updateUserById(data.userId, { password });
@@ -216,7 +231,7 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       .eq("user_id", data.userId);
     if (roleError) throw new Error("Password reset lifecycle update failed");
 
-    await userClient.from("audit_logs").insert({
+    const { error: auditError } = await userClient.from("audit_logs").insert({
       tenant_id: data.tenantId,
       user_id: actorId,
       action: "user.password_reset",
@@ -224,8 +239,15 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       entity_id: data.userId,
       meta: { role: membership.role, temporary_password_issued: true },
     });
+    if (auditError) throw new Error("Password reset audit failed");
 
-    return { tenantId: data.tenantId, userId: data.userId, username: profile.username, password, role: membership.role };
+    return {
+      tenantId: data.tenantId,
+      userId: data.userId,
+      username: profile.username,
+      password,
+      role: membership.role,
+    };
   });
 
 export const requestPasswordReset = createServerFn({ method: "POST" })
@@ -239,6 +261,7 @@ export const requestPasswordReset = createServerFn({ method: "POST" })
       ipKey === "unknown" ? Promise.resolve(true) : authRateAllowed(secret, "reset-ip", ipKey, 10),
     ]);
     if (!usernameAllowed || !ipAllowed) return { ok: true };
+
     const { data: profile } = await secret
       .from("profiles")
       .select("id")
