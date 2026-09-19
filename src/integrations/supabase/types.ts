@@ -848,10 +848,25 @@ export type Database = {
           p_lng?: number | null;
           p_accuracy?: number | null;
         };
-        Returns: { reading_id: string; bill_id: string | null; previous: number; current_reading: number; consumption: number; bill_total: number | null; arrears: number | null; project_name: string | null }[];
+        Returns: {
+          reading_id: string;
+          bill_id: string | null;
+          previous: number;
+          current_reading: number;
+          consumption: number;
+          bill_total: number | null;
+          arrears: number | null;
+          project_name: string | null;
+        }[];
       };
-      approve_water_reading: { Args: { p_reading_id: string }; Returns: { reading_id: string; bill_id: string | null; status: string }[] };
-      reject_water_reading: { Args: { p_reading_id: string; p_reason: string }; Returns: { reading_id: string; bill_id: string | null; status: string }[] };
+      approve_water_reading: {
+        Args: { p_reading_id: string };
+        Returns: { reading_id: string; bill_id: string | null; status: string }[];
+      };
+      reject_water_reading: {
+        Args: { p_reading_id: string; p_reason: string };
+        Returns: { reading_id: string; bill_id: string | null; status: string }[];
+      };
       record_water_payment: {
         Args: {
           p_bill_id: string;
@@ -861,8 +876,14 @@ export type Database = {
         };
         Returns: { payment_id: string; bill_id: string; amount: number; status: string }[];
       };
-      approve_water_payment: { Args: { p_payment_id: string }; Returns: { payment_id: string; status: string }[] };
-      reject_water_payment: { Args: { p_payment_id: string; p_reason: string }; Returns: { payment_id: string; status: string }[] };
+      approve_water_payment: {
+        Args: { p_payment_id: string };
+        Returns: { payment_id: string; status: string }[];
+      };
+      reject_water_payment: {
+        Args: { p_payment_id: string; p_reason: string };
+        Returns: { payment_id: string; status: string }[];
+      };
       record_water_production: {
         Args: {
           p_source_name: string;
