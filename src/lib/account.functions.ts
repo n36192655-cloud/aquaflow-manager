@@ -123,7 +123,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
 
     try {
       for (const item of roles) {
-        const { data: existing } = await admin
+        const { data: existing } = await userClient
           .from("user_roles")
           .select("user_id")
           .eq("tenant_id", data.tenantId)
@@ -133,7 +133,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
 
         let username = generateUsername(tenant.name, item.role);
         for (let attempt = 0; attempt < 5; attempt += 1) {
-          const { data: conflict } = await admin
+          const { data: conflict } = await userClient
             .from("profiles")
             .select("id")
             .eq("username", username)
