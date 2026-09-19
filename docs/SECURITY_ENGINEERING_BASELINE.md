@@ -35,7 +35,8 @@ Mizan development follows:
 - Storage objects containing field evidence must remain private and use short-lived signed URLs.
 
 ## Current hardening implemented on this branch
-- HTTP security response headers and no-store handling for dynamic HTML/JSON.
+- HTTP security response headers and no-store handling for dynamic HTML/JSON, including CSP `frame-ancestors 'none'`, `X-Frame-Options: DENY`, Origin-Agent-Cluster, and private-app noindex controls.
+- CI security gates using the repository's locked Bun dependency graph, lint/build verification, GitHub dependency-review on pull requests, and CodeQL JavaScript/TypeScript analysis.
 - Modern Supabase secret-key server client path.
 - Removal of unsafe browser table privileges through a migration.
 - Meter-reading image validation, 5 MiB client-side size ceiling, MIME allow-list, and correct file extension preservation.
@@ -51,6 +52,7 @@ No change is considered complete merely because it compiles. A release must have
 5. deployment/build verification,
 6. runtime error review,
 7. rollback path.
+8. CI security-gate results when the change is eligible for CI.
 
 ## Important assurance boundary
 “100% efficiency/security” is treated as a target, not a claim of mathematical perfection. The engineering objective is evidence-backed continuous hardening with no unverified assumptions.
