@@ -222,6 +222,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           tenant_id: string | null
           user_id: string
+          must_change_password: boolean
         }
         Insert: {
           created_at?: string
@@ -229,6 +230,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           tenant_id?: string | null
           user_id: string
+          must_change_password?: boolean
         }
         Update: {
           created_at?: string
@@ -236,6 +238,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           tenant_id?: string | null
           user_id?: string
+          must_change_password?: boolean
         }
         Relationships: [
           {
@@ -275,11 +278,11 @@ export type Database = {
           subtotal?: number
           tenant_id: string
           total?: number
-        }
           tariff_plan_id?: string | null
           tariff_category?: string | null
           consumption_lpd?: number | null
           tariff_breakdown?: Json
+        }
         Update: {
           arrears?: number
           created_at?: string
