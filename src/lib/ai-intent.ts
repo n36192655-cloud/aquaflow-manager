@@ -1,26 +1,24 @@
-import { useStore, billBalance } from "./store";
-import { fmtYER, fmtNum, priceFor } from "./pricing";
+import { supabase } from "./supabase";
 
 export type AiResponse =
   | { kind: "text"; text: string; suggestions?: string[] }
   | { kind: "suggestions"; text: string; suggestions: string[] }
   | {
       kind: "subscriber_ledger";
-      customer: { id: number; name: string; phone: string; pay_account: string; directorate?: string };
+      customer: { id: string; name: string; phone: string | null; pay_account: string | null; address?: string | null };
       totals: { paid: number; arrears: number; billed: number };
       series: Array<{ label: string; consumption: number; amount: number }>;
     }
   | {
       kind: "loss_analysis";
       range: { from: string; to: string };
-      water: { produced: number; consumed: number; loss: number; pct: number };
-      electric: { produced: number; consumed: number; loss: number; pct: number };
+      water: { produced: number; consumed: number; loss: number; pct: number | null };
       alerts: string[];
     }
   | {
       kind: "payment_status";
-      paid: Array<{ id: number; name: string; serial: string; total: number }>;
-      unpaid: Array<{ id: number; name: string; serial: string; total: number; balance: number }>;
+      paid: Array<{ id: string; name: string; serial: string; total: number }>;
+      unpaid: Array<{ id: string; name: string; serial: string; total: number; balance: number }>;
     }
   | {
       kind: "revenue_report";
@@ -29,155 +27,216 @@ export type AiResponse =
       series: Array<{ day: string; cash: number; bank: number; total: number }>;
     };
 
-function todayRange() {
-  const d = new Date();
-  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  return { start, end: start + 86400000, label: "اليوم" };
-}
-function monthRange() {
-  const d = new Date();
-  const start = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
-  return { start, end, label: "هذا الشهر" };
-}
-function weekRange() {
+const SUGGESTIONS = [
+  "استعلام عن مشترك",
+  "تحليل الفاقد لهذا الشهر",
+  "من دفع ومن لم يدفع؟",
+  "استعلام عن التحصيل اليوم",
+];
+
+function rangeFor(text: string) {
   const now = new Date();
-  const start = now.getTime() - 7 * 86400000;
-  return { start, end: now.getTime(), label: "آخر 7 أيام" };
-}
-function iso(t: number) { return new Date(t).toISOString().slice(0, 10); }
-
-function findCustomer(q: string) {
-  const s = useStore.getState();
-  const clean = q.trim().toLowerCase();
-  return s.customers.find((c) =>
-    c.name.toLowerCase().includes(clean) ||
-    c.phone.includes(clean) ||
-    String(c.id) === clean,
-  );
+  if (text.includes("اليوم")) {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { start, end: new Date(start.getTime() + 86400000), label: "اليوم" };
+  }
+  if (text.includes("أسبوع") || text.includes("اسبوع")) {
+    return { start: new Date(now.getTime() - 7 * 86400000), end: now, label: "آخر 7 أيام" };
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { start, end: new Date(now.getFullYear(), now.getMonth() + 1, 1), label: "هذا الشهر" };
 }
 
-export function answerQuestion(q: string): AiResponse {
-  const s = useStore.getState();
-  const text = q.trim();
-  const has = (...kws: string[]) => kws.some((k) => text.includes(k));
+function day(t: string) {
+  return new Date(t).toISOString().slice(0, 10);
+}
 
-  // 1) Subscriber ledger
-  if (has("استعلام عن مشترك", "مشترك", "حساب", "كشف حساب", "ذمة", "رصيد")) {
-    // Try to extract a name/phone after keyword
-    const m = text.match(/(?:عن\s+مشترك|مشترك|حساب)\s+(.+?)(?:$|[?؟])/);
-    let target = m ? findCustomer(m[1]) : undefined;
-    if (!target) {
-      // Look for any customer name inside
-      target = s.customers.find((c) => text.includes(c.name.split(/\s+/)[0]));
-    }
-    if (!target) {
-      return {
-        kind: "suggestions",
-        text: "حدد المشترك — يمكنك اختيار أحد المشتركين النشطين:",
-        suggestions: s.customers.slice(0, 6).map((c) => `استعلام عن مشترك ${c.name}`),
-      };
-    }
-    const customerBills = s.bills.filter((b) => b.customer_id === target!.id).sort((a, b) => +new Date(a.date) - +new Date(b.date));
-    const paid = s.payments
-      .filter((p) => p.status === "approved" && customerBills.some((b) => b.id === p.bill_id))
-      .reduce((a, p) => a + p.amount, 0);
-    const arrears = customerBills.reduce((a, b) => a + billBalance(b, s.payments), 0);
-    const billed = customerBills.reduce((a, b) => a + b.total, 0);
-    const series = customerBills.slice(-6).map((b) => {
-      const r = s.readings.find((x) => x.id === b.reading_id);
-      return {
-        label: new Date(b.date).toLocaleDateString("ar-EG", { month: "short" }),
-        consumption: r?.consumption ?? 0,
-        amount: b.total,
-      };
-    });
-    return {
-      kind: "subscriber_ledger",
-      customer: { id: target.id, name: target.name, phone: target.phone, pay_account: target.pay_account, directorate: target.directorate },
-      totals: { paid, arrears, billed },
-      series,
-    };
-  }
-
-  // 2) Loss analysis
-  if (has("فاقد", "تسرب", "خسائر", "تحليل الفاقد")) {
-    const range = has("اليوم") ? todayRange() : has("أسبوع", "اسبوع") ? weekRange() : monthRange();
-    const perType = (t: "water" | "electric") => {
-      const produced = s.productionLogs
-        .filter((p) => p.type === t && +new Date(p.date) >= range.start && +new Date(p.date) < range.end)
-        .reduce((a, b) => a + b.units, 0);
-      const meterIds = new Set(s.meters.filter((m) => m.type === t).map((m) => m.id));
-      const consumed = s.readings
-        .filter((r) => meterIds.has(r.meter_id) && r.status !== "rejected" && +new Date(r.date) >= range.start && +new Date(r.date) < range.end)
-        .reduce((a, b) => a + b.consumption, 0);
-      const loss = Math.max(0, produced - consumed);
-      const pct = produced > 0 ? (loss / produced) * 100 : 0;
-      return { produced, consumed, loss, pct };
-    };
-    const water = perType("water");
-    const electric = perType("electric");
-    const alerts: string[] = [];
-    if (water.pct > 15) alerts.push(`فاقد المياه ${water.pct.toFixed(1)}% — يُوصى بجولات تفتيش للتسريبات وفحص التوصيلات غير المشروعة في الشبكات عالية الاستهلاك`);
-    if (electric.pct > 15) alerts.push(`فاقد الكهرباء ${electric.pct.toFixed(1)}% — يُوصى بمسح ميداني للتوصيلات المخالفة ومعايرة العدادات`);
-    return {
-      kind: "loss_analysis",
-      range: { from: iso(range.start), to: iso(range.end - 1) },
-      water, electric, alerts,
-    };
-  }
-
-  // 3) Payment status
-  if (has("من دفع", "من لم يدفع", "المدفوع", "غير المدفوع", "المتأخرين", "متأخر", "حالة الدفع")) {
-    const paid = s.bills.filter((b) => b.status === "paid").slice(0, 50).map((b) => {
-      const c = s.customers.find((x) => x.id === b.customer_id);
-      return { id: b.id, name: c?.name ?? "—", serial: b.serial, total: b.total };
-    });
-    const unpaid = s.bills.filter((b) => b.status !== "paid").slice(0, 50).map((b) => {
-      const c = s.customers.find((x) => x.id === b.customer_id);
-      return { id: b.id, name: c?.name ?? "—", serial: b.serial, total: b.total, balance: billBalance(b, s.payments) };
-    });
-    return { kind: "payment_status", paid, unpaid };
-  }
-
-  // 4) Revenue report
-  if (has("تحصيل", "محصل", "ايراد", "إيراد", "دخل")) {
-    const range = has("اليوم") ? todayRange() : has("أسبوع", "اسبوع") ? weekRange() : monthRange();
-    const payments = s.payments.filter((p) => p.status === "approved" && +new Date(p.date) >= range.start && +new Date(p.date) < range.end);
-    const cash = payments.filter((p) => p.method === "نقدي").reduce((a, b) => a + b.amount, 0);
-    const bank = payments.filter((p) => p.method === "الكريمي").reduce((a, b) => a + b.amount, 0);
-    const total = cash + bank;
-    const days = new Map<string, { cash: number; bank: number; total: number }>();
-    payments.forEach((p) => {
-      const d = iso(+new Date(p.date));
-      const cur = days.get(d) ?? { cash: 0, bank: 0, total: 0 };
-      if (p.method === "نقدي") cur.cash += p.amount; else if (p.method === "الكريمي") cur.bank += p.amount;
-      cur.total += p.amount;
-      days.set(d, cur);
-    });
-    const series = [...days.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([day, v]) => ({ day: day.slice(5), ...v }));
-    return {
-      kind: "revenue_report",
-      range: { from: iso(range.start), to: iso(range.end - 1), label: range.label },
-      totals: { cash, bank, total, count: payments.length, avg: payments.length ? total / payments.length : 0 },
-      series,
-    };
-  }
-
-  // Fallback: intent suggestions
+function genericDataError(): AiResponse {
   return {
-    kind: "suggestions",
-    text: "اختر استعلاماً — ميزان الذكي يدعم أربعة تقارير رئيسية:",
-    suggestions: [
-      "استعلام عن مشترك",
-      "تحليل الفاقد لهذا الشهر",
-      "من دفع ومن لم يدفع؟",
-      "استعلام عن التحصيل اليوم",
-    ],
+    kind: "text",
+    text: "تعذر قراءة البيانات الحقيقية من قاعدة البيانات حالياً. لم يتم إنشاء أو تقدير أي نتيجة.",
+    suggestions: SUGGESTIONS,
   };
 }
 
-// keep helpers referenced (for compatibility)
-export { fmtYER, fmtNum, priceFor };
+async function currentTenantId(): Promise<string | null> {
+  const { data, error } = await supabase.rpc("current_tenant_id");
+  if (error || typeof data !== "string" || !data) return null;
+  return data;
+}
+
+async function subscriberLedger(tenantId: string, text: string): Promise<AiResponse> {
+  const match = text.match(/(?:عن\s+مشترك|مشترك|حساب|كشف\s+حساب)\s+(.+?)(?:$|[?؟])/);
+  const query = (match?.[1] ?? "").trim();
+
+  if (!query) {
+    return { kind: "suggestions", text: "حدد المشترك بالاسم أو رقم الهاتف أو رقم حساب السداد.", suggestions: SUGGESTIONS };
+  }
+
+  const [byName, byPhone, byAccount] = await Promise.all([
+    supabase.from("customers").select("id,name,phone,address,pay_account").eq("tenant_id", tenantId).ilike("name", `%${query}%`).limit(5),
+    supabase.from("customers").select("id,name,phone,address,pay_account").eq("tenant_id", tenantId).ilike("phone", `%${query}%`).limit(5),
+    supabase.from("customers").select("id,name,phone,address,pay_account").eq("tenant_id", tenantId).ilike("pay_account", `%${query}%`).limit(5),
+  ]);
+  const error = byName.error ?? byPhone.error ?? byAccount.error;
+  if (error) return genericDataError();
+
+  const customers = [...(byName.data ?? []), ...(byPhone.data ?? []), ...(byAccount.data ?? [])];
+  const customer = customers.find((item, index, all) => all.findIndex((x) => x.id === item.id) === index);
+  if (!customer) {
+    return { kind: "suggestions", text: "لم أجد مشتركاً مطابقاً في قاعدة البيانات الحالية. لم يتم اختراع نتيجة.", suggestions: SUGGESTIONS };
+  }
+
+  const [billsResult, paymentsResult] = await Promise.all([
+    supabase.from("water_bills").select("id,reading_id,total,status,issued_at").eq("tenant_id", tenantId).eq("customer_id", customer.id).order("issued_at", { ascending: true }),
+    supabase.from("payments").select("id,bill_id,amount,status,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: true }),
+  ]);
+  if (billsResult.error || paymentsResult.error) return genericDataError();
+
+  const bills = billsResult.data ?? [];
+  const billIds = new Set(bills.map((b) => b.id));
+  const payments = (paymentsResult.data ?? []).filter((p) => billIds.has(p.bill_id));
+  const paidByBill = new Map<string, number>();
+  for (const payment of payments) {
+    if (payment.status === "approved") paidByBill.set(payment.bill_id, (paidByBill.get(payment.bill_id) ?? 0) + Number(payment.amount));
+  }
+
+  const billed = bills.reduce((sum, bill) => sum + Number(bill.total), 0);
+  const paid = payments.filter((p) => p.status === "approved").reduce((sum, p) => sum + Number(p.amount), 0);
+  const arrears = bills.reduce((sum, bill) => sum + Math.max(0, Number(bill.total) - (paidByBill.get(bill.id) ?? 0)), 0);
+
+  const readingIds = bills.map((b) => b.reading_id).filter((id): id is string => Boolean(id));
+  const readingsResult = readingIds.length
+    ? await supabase.from("water_readings").select("id,consumption,created_at").eq("tenant_id", tenantId).in("id", readingIds)
+    : { data: [], error: null };
+  if (readingsResult.error) return genericDataError();
+  const readings = new Map((readingsResult.data ?? []).map((reading) => [reading.id, reading]));
+
+  const series = bills.slice(-12).map((bill) => ({
+    label: new Intl.DateTimeFormat("ar-YE", { month: "short", day: "numeric" }).format(new Date(bill.issued_at)),
+    consumption: Number(readings.get(bill.reading_id ?? "")?.consumption ?? 0),
+    amount: Number(bill.total),
+  }));
+
+  return {
+    kind: "subscriber_ledger",
+    customer: { id: customer.id, name: customer.name, phone: customer.phone, pay_account: customer.pay_account, address: customer.address },
+    totals: { paid, arrears, billed },
+    series,
+  };
+}
+
+async function lossAnalysis(tenantId: string, text: string): Promise<AiResponse> {
+  const range = rangeFor(text);
+  const start = range.start.toISOString();
+  const end = range.end.toISOString();
+
+  const [productionResult, readingsResult] = await Promise.all([
+    supabase.from("water_production_logs").select("production_m3,recorded_at,verification_status").eq("tenant_id", tenantId).gte("recorded_at", start).lt("recorded_at", end),
+    supabase.from("water_readings").select("consumption,created_at,status,verification_status").eq("tenant_id", tenantId).gte("created_at", start).lt("created_at", end),
+  ]);
+  if (productionResult.error || readingsResult.error) return genericDataError();
+
+  const production = (productionResult.data ?? [])
+    .filter((row) => row.verification_status === "approved" && Number.isFinite(Number(row.production_m3)) && Number(row.production_m3) > 0)
+    .reduce((sum, row) => sum + Number(row.production_m3), 0);
+  const consumed = (readingsResult.data ?? [])
+    .filter((row) => row.verification_status === "approved" && row.status === "approved" && Number.isFinite(Number(row.consumption)) && Number(row.consumption) >= 0)
+    .reduce((sum, row) => sum + Number(row.consumption), 0);
+
+  const loss = production - consumed;
+  const pct = production > 0 ? (loss / production) * 100 : null;
+  const alerts: string[] = [];
+  if (production === 0) alerts.push("غير متاح: لا توجد بيانات إنتاج/ضخ معتمدة في الفترة.");
+  if (loss < 0) alerts.push("تحذير جودة بيانات: الاستهلاك المعتمد يتجاوز مدخل المياه المعتمد؛ لم يتم إخفاء التناقض أو تحويله إلى صفر.");
+  if (pct != null && pct > 15) alerts.push(`الفاقد الحسابي ${pct.toFixed(1)}% ويتطلب تفسيراً ميدانياً قبل وصفه كتسرب أو فاقد فني.`);
+
+  return {
+    kind: "loss_analysis",
+    range: { from: day(start), to: day(new Date(range.end.getTime() - 1).toISOString()) },
+    water: { produced: production, consumed, loss, pct },
+    alerts,
+  };
+}
+
+async function paymentStatus(tenantId: string): Promise<AiResponse> {
+  const [billsResult, customersResult, paymentsResult] = await Promise.all([
+    supabase.from("water_bills").select("id,serial,total,status,customer_id").eq("tenant_id", tenantId).order("issued_at", { ascending: false }).limit(200),
+    supabase.from("customers").select("id,name").eq("tenant_id", tenantId),
+    supabase.from("payments").select("bill_id,amount,status").eq("tenant_id", tenantId),
+  ]);
+  if (billsResult.error || customersResult.error || paymentsResult.error) return genericDataError();
+
+  const customers = new Map((customersResult.data ?? []).map((c) => [c.id, c.name]));
+  const approvedByBill = new Map<string, number>();
+  for (const p of paymentsResult.data ?? []) {
+    if (p.status === "approved") approvedByBill.set(p.bill_id, (approvedByBill.get(p.bill_id) ?? 0) + Number(p.amount));
+  }
+
+  const paid: Array<{ id: string; name: string; serial: string; total: number }> = [];
+  const unpaid: Array<{ id: string; name: string; serial: string; total: number; balance: number }> = [];
+  for (const bill of billsResult.data ?? []) {
+    const total = Number(bill.total);
+    const paidAmount = approvedByBill.get(bill.id) ?? 0;
+    const balance = Math.max(0, total - paidAmount);
+    const name = customers.get(bill.customer_id) ?? "—";
+    if (balance <= 0 && paidAmount > 0) paid.push({ id: bill.id, name, serial: bill.serial, total });
+    else unpaid.push({ id: bill.id, name, serial: bill.serial, total, balance });
+  }
+  return { kind: "payment_status", paid, unpaid };
+}
+
+async function revenueReport(tenantId: string, text: string): Promise<AiResponse> {
+  const range = rangeFor(text);
+  const [paymentsResult] = await Promise.all([
+    supabase.from("payments").select("amount,status,method,created_at").eq("tenant_id", tenantId).eq("status", "approved").gte("created_at", range.start.toISOString()).lt("created_at", range.end.toISOString()),
+  ]);
+  if (paymentsResult.error) return genericDataError();
+
+  const cash = (paymentsResult.data ?? []).filter((p) => p.method === "cash").reduce((sum, p) => sum + Number(p.amount), 0);
+  const bank = (paymentsResult.data ?? []).filter((p) => p.method !== "cash").reduce((sum, p) => sum + Number(p.amount), 0);
+  const total = cash + bank;
+  const days = new Map<string, { cash: number; bank: number; total: number }>();
+  for (const p of paymentsResult.data ?? []) {
+    const key = day(p.created_at);
+    const row = days.get(key) ?? { cash: 0, bank: 0, total: 0 };
+    if (p.method === "cash") row.cash += Number(p.amount); else row.bank += Number(p.amount);
+    row.total += Number(p.amount);
+    days.set(key, row);
+  }
+
+  return {
+    kind: "revenue_report",
+    range: { from: day(range.start.toISOString()), to: day(new Date(range.end.getTime() - 1).toISOString()), label: range.label },
+    totals: { cash, bank, total, count: paymentsResult.data?.length ?? 0, avg: paymentsResult.data?.length ? total / paymentsResult.data.length : 0 },
+    series: [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([dayKey, value]) => ({ day: dayKey.slice(5), ...value })),
+  };
+}
+
+export async function answerQuestion(q: string): Promise<AiResponse> {
+  const text = q.trim();
+  if (!text) return { kind: "suggestions", text: "اكتب سؤالك وسأبحث في بيانات المشروع الحالية فقط.", suggestions: SUGGESTIONS };
+
+  const tenantId = await currentTenantId();
+  if (!tenantId) {
+    return { kind: "text", text: "لا يوجد مشروع تشغيلي مرتبط بالحساب الحالي. لا توجد بيانات يمكن عرضها.", suggestions: SUGGESTIONS };
+  }
+
+  try {
+    if (text.includes("مشترك") || text.includes("كشف حساب") || text.includes("رصيد") || text.includes("ذمة")) {
+      return await subscriberLedger(tenantId, text);
+    }
+    if (text.includes("فاقد") || text.includes("تسرب") || text.includes("خسائر") || text.includes("تحليل الفاقد")) {
+      return await lossAnalysis(tenantId, text);
+    }
+    if (text.includes("من دفع") || text.includes("من لم يدفع") || text.includes("المدفوع") || text.includes("غير المدفوع") || text.includes("حالة الدفع")) {
+      return await paymentStatus(tenantId);
+    }
+    if (text.includes("تحصيل") || text.includes("محصل") || text.includes("ايراد") || text.includes("إيراد") || text.includes("دخل")) {
+      return await revenueReport(tenantId, text);
+    }
+    return { kind: "suggestions", text: "أستطيع الإجابة من بيانات قاعدة البيانات الحالية فقط. اختر نوع الاستعلام:", suggestions: SUGGESTIONS };
+  } catch {
+    return genericDataError();
+  }
+}
