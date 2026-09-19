@@ -107,6 +107,10 @@ BEGIN
     IF v_decimal_digits IS NULL OR v_integer_digits IS NULL THEN
       RAISE EXCEPTION 'Meter precision profile is incomplete';
     END IF;
+    IF v_integer_digits < 0 OR v_decimal_digits < 0
+       OR v_integer_digits > 12 OR v_decimal_digits > 6 THEN
+      RAISE EXCEPTION 'Meter precision profile is invalid';
+    END IF;
     IF scale(p_current) > v_decimal_digits THEN
       RAISE EXCEPTION 'Reading has more decimal places than the meter profile permits';
     END IF;
