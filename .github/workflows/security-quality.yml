@@ -6,7 +6,7 @@ on:
       - feat/mizan-field-readiness-2026-09-11
   pull_request:
     branches:
-      - feat/mizan-field-readiness-2026-09-11
+      - main
 
 permissions:
   contents: read
