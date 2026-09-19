@@ -42,11 +42,11 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
-function withSecurityHeaders(response: Response): Response {
+function withSecurityHeaders(response: Response, requestUrl?: string): Response {
   const headers = new Headers(response.headers);
   const contentType = headers.get("content-type") ?? "";
 
-  if (response.url.startsWith("https://")) {
+  if ((requestUrl ?? response.url).startsWith("https://")) {
     headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
 
@@ -78,7 +78,7 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), request.url);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
