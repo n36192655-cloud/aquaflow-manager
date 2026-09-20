@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { MeterCamera, type OcrResult } from "@/components/meter-camera";
+import { useOnlineStatus, addPending } from "@/lib/sync";
 import { useAuth } from "@/lib/auth";
 import {
   useOnlineStatus,

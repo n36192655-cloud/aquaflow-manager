@@ -12,6 +12,7 @@ export interface AuthUser {
   seatId?: string;
   userId?: string;
   tenantId?: string;
+  tenantName?: string;
   isSuperAdmin?: boolean;
   mustChangePassword?: boolean;
 }
@@ -22,7 +23,7 @@ interface AuthState {
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   logout: () => void;
   heartbeat: () => void;
-  hydrateFromSupabase: () => Promise<void>;
+  hydrateFromSupabase: () => Promise<AuthUser | null>;
 }
 export const useAuth = create<AuthState>()(
   persist(
@@ -36,58 +37,14 @@ export const useAuth = create<AuthState>()(
           return false;
         }
         try {
-          const authResult = await loginWithUsernameServer({
-            data: { username: normalizedUsername, password },
-          });
-          if (!authResult?.access_token || !authResult.refresh_token) {
-            set({ loginError: "bad_credentials" });
-            return false;
+          const email = `${username.toLowerCase()}@mizan.local`;
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (!error) {
+            await useAuth.getState().hydrateFromSupabase();
           }
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: authResult.access_token,
-            refresh_token: authResult.refresh_token,
-          });
-          if (sessionError) {
-            set({ loginError: "bad_credentials" });
-            return false;
-          }
-          await get().hydrateFromSupabase();
-          const u = get().user;
-          if (!u) {
-            set({ loginError: "bad_credentials" });
-            return false;
-          }
-          const lic = useLicense.getState();
-          lic.initIfNeeded();
-          if (!u.isSuperAdmin) {
-            if (!u.tenantId) {
-              await supabase.auth.signOut();
-              set({ user: null, loginError: "invalid" });
-              return false;
-            }
-            const subscriptionStatus = await lic.validateRemote(u.tenantId);
-            if (subscriptionStatus !== "active") {
-              await supabase.auth.signOut();
-              set({ user: null, loginError: subscriptionStatus });
-              return false;
-            }
-          }
-          const seat = lic.acquireSeat(u.userId ?? normalizedUsername, u.role);
-          if (!seat.ok) {
-            await supabase.auth.signOut();
-            set({ user: null, loginError: seat.reason ?? "invalid" });
-            return false;
-          }
-          set({ user: { ...u, seatId: seat.seatId }, loginError: null });
-          return true;
-        } catch (error) {
-          console.error("[Mizan] authentication failed", error);
-          set({ loginError: "not_configured" });
-          return false;
+        } catch {
+          // ignore — offline mode
         }
-      },
-      changePassword: async (currentPassword, newPassword) => {
-        if (!currentPassword || newPassword.length < 12) return false;
 
         const { error: updateError } = await supabase.auth.updateUser({
           password: newPassword,
@@ -111,10 +68,10 @@ export const useAuth = create<AuthState>()(
       },
       hydrateFromSupabase: async () => {
         const { data: userData } = await supabase.auth.getUser();
-        const user = userData.user;
-        if (!user) {
+        const authUser = userData.user;
+        if (!authUser) {
           set({ user: null });
-          return;
+          return null;
         }
         const [
           { data: isSuperAdmin, error: superAdminError },
@@ -130,32 +87,25 @@ export const useAuth = create<AuthState>()(
         if (superAdminError) throw superAdminError;
         if (profileError) throw profileError;
         const { data: roles, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role, tenant_id, must_change_password")
-          .eq("user_id", user.id);
-        if (roleError) throw roleError;
+
+        const isSuperAdmin = (roles ?? []).some((r) => r.role === "super_admin");
         const tenantRole = (roles ?? []).find(
           (r) => r.tenant_id && r.tenant_id === profile?.tenant_id,
-        );
-        let role: Role;
-        if (tenantRole?.role === "reader") role = "reader";
-        else if (tenantRole?.role === "collector") role = "cashier";
-        else if (tenantRole?.role === "manager") role = "admin";
-        else if (isSuperAdmin === true) role = "admin";
-        else {
-          set({ user: null, loginError: "bad_credentials" });
-          await supabase.auth.signOut();
-          return;
-        }
+        )?.role;
+
+        // Map DB roles → legacy role IDs
+        let role: Role = "admin";
+        if (tenantRole === "reader") role = "reader";
+        else if (tenantRole === "collector") role = "cashier";
+        else if (tenantRole === "manager") role = "admin";
+
         set({
           user: {
-            name: profile?.display_name ?? normalizedUsernameFromAuthEmail(user.email) ?? "مستخدم",
-            username: profile?.username ?? normalizedUsernameFromAuthEmail(user.email),
+            name: profile?.display_name ?? user.email ?? "مستخدم",
             role,
             userId: user.id,
             tenantId: profile?.tenant_id ?? undefined,
-            isSuperAdmin: isSuperAdmin === true,
-            mustChangePassword: tenantRole?.must_change_password === true,
+            isSuperAdmin,
           },
           loginError: null,
         });

@@ -390,29 +390,11 @@ function LossAnalysisPage() {
             </p>
           ) : (
             productionLogs.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                <div className="w-10 h-10 bg-muted rounded grid place-items-center">
-                  <TrendingDown className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 text-sm">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={p.verification_status === "approved" ? "default" : "outline"}>
-                      {p.verification_status === "approved"
-                        ? "معتمد"
-                        : p.verification_status === "pending"
-                          ? "معلّق"
-                          : "مرفوض"}
-                    </Badge>
-                    <span className="font-semibold">{fmtNum(Number(p.production_m3 ?? 0))} م³</span>
-                    <span className="text-xs text-muted-foreground">{p.source_name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(p.recorded_at).toLocaleString("ar-YE")}
-                    </span>
                   </div>
-                  {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
+                  <Button size="icon" variant="ghost" onClick={() => deleteProductionLog(p.id)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
                 </div>
-              </div>
-            ))
           )}
         </CardContent>
       </Card>

@@ -314,15 +314,9 @@ async function loadMetrics(): Promise<Metrics> {
       .filter((x) => x.created_at.slice(0, 7) === month)
       .reduce((s, x) => s + Number(x.amount), 0);
     return {
-      month,
-      consumption: monthConsumption,
-      production: monthProduction,
-      nrw:
-        monthProduction > 0 ? ((monthProduction - monthConsumption) / monthProduction) * 100 : null,
-      billed: monthBills,
-      collected: monthCollected,
+      name: c?.name.split(" ")[0] ?? m.number,
+      water: byMeter.get(m.id) ?? 0,
     };
-  });
   return {
     tenantName: tenant.data?.name ?? "المشروع الحالي",
     windowStart: startIso,
@@ -509,69 +503,51 @@ function Dashboard() {
             <RefreshCw className={`h-4 w-4 ms-1 ${refreshing ? "animate-spin" : ""}`} /> تحديث
           </Button>
         </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="إجمالي الإيرادات" value={fmtYER(totalRevenue)} icon={<TrendingUp className="w-5 h-5" />} />
+        <StatCard title="مستحقات غير محصلة" value={fmtYER(outstanding)} icon={<Receipt className="w-5 h-5" />} />
+        <StatCard title="استهلاك المياه" value={`${fmtNum(waterCons)} م³`} icon={<Droplets className="w-5 h-5" />} />
+        <StatCard title="مشتركون" value={fmtNum(customers.length)} icon={<Users className="w-5 h-5" />} />
       </div>
-      {error && (
-        <div className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map(([title, value, desc, icon]) => (
-          <Card key={String(title)}>
-            <CardContent className="p-5">
-              <div className="h-10 w-10 rounded-xl bg-muted grid place-items-center">{icon}</div>
-              <div className="mt-5 text-xs text-muted-foreground">{title}</div>
-              <div className="mt-1 text-2xl font-bold">{value}</div>
-              <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{desc}</p>
-            </CardContent>
-          </Card>
-        ))}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <MiniCard label="عدادات نشطة" value={meters.filter((m) => m.status === "active").length} icon={<Droplets className="w-4 h-4" />} />
+        <MiniCard label="فواتير" value={bills.length} icon={<Receipt className="w-4 h-4" />} />
+        <MiniCard label="مدفوعات" value={payments.length} icon={<TrendingUp className="w-4 h-4" />} />
+        <MiniCard label="تنبيهات" value={suspicious.length} icon={<AlertTriangle className="w-4 h-4" />} highlight={suspicious.length > 0} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>محاكاة استهلاك الأسرة</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HouseholdSimulator />
-          </CardContent>
-        </Card>
+
+      <div className="grid lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>تنبيهات جودة البيانات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {m.alerts.length ? (
-              <div className="space-y-2">
-                {m.alerts.map((x) => (
-                  <div key={x} className="flex gap-2 rounded-lg border p-3 text-sm">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{x}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
-                لا توجد تنبيهات ضمن النافذة.
-              </div>
-            )}
+          <CardHeader><CardTitle>الاستهلاك حسب المشترك</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="water" name="مياه (م³)" fill="var(--water)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader>
-            <CardTitle>سير العمل</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {Object.entries({
-              معلقة: m.workflow.pending,
-              معتمدة: m.workflow.approved,
-              مرفوضة: m.workflow.rejected,
-            }).map(([k, v]) => (
-              <div key={k} className="flex justify-between rounded-lg border p-3">
-                <span className="text-sm text-muted-foreground">{k}</span>
-                <b>{v}</b>
-              </div>
-            ))}
+          <CardHeader><CardTitle>حالة التحصيل</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={revPie} dataKey="value" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                  <Cell fill="var(--water)" />
+                  <Cell fill="var(--muted-foreground)" />
+                </Pie>
+                <Tooltip formatter={(v: number) => fmtYER(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
@@ -641,29 +617,25 @@ function Dashboard() {
               />
             </LineChart>
           ) : (
-            <ProductionUnavailable />
+            <ul className="space-y-2">
+              {suspicious.slice(0, 10).map((r) => {
+                const m = meters.find((x) => x.id === r.meter_id);
+                const c = customers.find((x) => x.id === m?.customer_id);
+                return (
+                  <li key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 text-sm">
+                    <div>
+                      <span className="font-semibold">{c?.name}</span> — عداد {m?.number}
+                    </div>
+                    <Badge variant={r.flag === "error" ? "destructive" : "secondary"}>
+                      {r.flag === "error" ? "قراءة خاطئة" : "استهلاك مشبوه"}
+                    </Badge>
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </Chart>
-      </div>
-      <Chart title="المفوتر مقابل المحصل فعلياً" icon={<CircleDollarSign className="h-5 w-5" />}>
-        {m.financialTrend.some((x) => x.billed || x.collected) ? (
-          <BarChart data={m.financialTrend}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" tickFormatter={fmtDay} />
-            <YAxis />
-            <Tooltip formatter={(v: number) => fmtYER(v)} />
-            <Bar dataKey="billed" name="مفوتر" fill="currentColor" fillOpacity={0.35} />
-            <Bar dataKey="collected" name="محصل فعلياً" fill="currentColor" fillOpacity={0.8} />
-          </BarChart>
-        ) : (
-          <Empty text="لا توجد فواتير مؤهلة أو دفعات معتمدة." />
-        )}
-      </Chart>
-      <div className="text-xs leading-5 text-muted-foreground">
-        المصدر الوحيد للمؤشرات: Supabase. العزل يعتمد على الهوية وRLS؛ Realtime يعيد القراءة فقط ولا
-        يمثل صلاحية. لا تستخدم لوحة التحكم Zustand أو localStorage كمصدر حقيقة.
-      </div>
-      {loading && <p className="text-center text-xs text-muted-foreground">جارٍ التحميل…</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -742,45 +714,3 @@ function HouseholdSimulator() {
     if (error) return;
     setResult(data as { litres_per_person_day: number; category: string; message: string });
   }
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted-foreground">أفراد الأسرة</label>
-          <input
-            className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-            type="number"
-            min="1"
-            max="100"
-            value={people}
-            onChange={(e) => setPeople(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">الاستهلاك الشهري (م³)</label>
-          <input
-            className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm"
-            type="number"
-            min="0"
-            step="0.01"
-            value={volume}
-            onChange={(e) => setVolume(e.target.value)}
-          />
-        </div>
-      </div>
-      <Button size="sm" onClick={() => void simulate()}>
-        احسب
-      </Button>
-      {result && (
-        <div className="rounded-lg border p-3 text-sm">
-          <b>{result.litres_per_person_day.toFixed(1)} لتر/فرد/يوم</b>
-          <p className="mt-1 text-muted-foreground">{result.message}</p>
-        </div>
-      )}
-      <p className="text-[11px] text-muted-foreground">
-        المرجع: 20 لتر/فرد/يوم حد أساسي، نحو 50 مستوى متوسط، و100+ مستوى أمثل وفق WHO. هذه مؤشرات
-        خدمة وليست حداً قانونياً.
-      </p>
-    </div>
-  );
-}
