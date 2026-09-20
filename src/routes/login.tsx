@@ -126,14 +126,6 @@ function LoginPage() {
             >
               {busy ? "جارٍ التحقق…" : "دخول آمن"}
             </Button>
-            <Button
-              type="button"
-              variant="link"
-              className="w-full"
-              onClick={() => navigate({ to: "/forgot-password" })}
-            >
-              نسيت كلمة المرور؟
-            </Button>
             {mounted && licStatus !== "active" && (
               <p className="text-xs text-destructive text-center">
                 {statusLabel(licStatus)} — تواصل مع مزوّد الخدمة
