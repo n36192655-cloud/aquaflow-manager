@@ -2,104 +2,70 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useLicense, type LicenseStatus } from "./license";
 import { supabase } from "./supabase";
+import { loginWithUsername as loginWithUsernameServer } from "./account.functions";
 
-// Role IDs are stable for backwards compat with existing route/canAccess
-// checks. Labels map to the water-utility RBAC contract:
-//   admin  → Project Manager (مدير مشروع)   [DB role: manager]
-//   reader → Meter Reader     (قارئ عدادات) [DB role: reader]
-//   cashier→ Collector        (محصل)        [DB role: collector]
 export type Role = "admin" | "reader" | "cashier";
-
 export interface AuthUser {
   name: string;
+  username?: string;
   role: Role;
   seatId?: string;
   userId?: string;
   tenantId?: string;
   tenantName?: string;
   isSuperAdmin?: boolean;
+  mustChangePassword?: boolean;
 }
-
-export type LoginError = LicenseStatus | "bad_credentials" | "no_membership";
-
 interface AuthState {
   user: AuthUser | null;
-  loginError: LoginError | null;
+  loginError: LicenseStatus | "bad_credentials" | "not_configured" | null;
   login: (username: string, password: string) => Promise<boolean>;
-  loginWithSupabase: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  logout: () => void;
   heartbeat: () => void;
   hydrateFromSupabase: () => Promise<AuthUser | null>;
 }
-
-// Usernames are mapped to a synthetic internal email so operators can sign in
-// with a short username while authentication stays fully inside Supabase Auth.
-const AUTH_EMAIL_DOMAIN = "mizan.local";
-
-function usernameToEmail(username: string): string {
-  const u = username.trim().toLowerCase();
-  return u.includes("@") ? u : `${u}@${AUTH_EMAIL_DOMAIN}`;
-}
-
-function mapDbRole(dbRole: string | undefined): Role | null {
-  if (dbRole === "manager") return "admin";
-  if (dbRole === "reader") return "reader";
-  if (dbRole === "collector") return "cashier";
-  return null;
-}
-
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       loginError: null,
-
-      // Single production login path: Supabase Auth only. There is no demo or
-      // offline credential that can reach operational tenant data.
       login: async (username, password) => {
-        if (!username.trim() || !password) {
+        const normalizedUsername = username.trim().toLowerCase();
+        if (!normalizedUsername || !password) {
           set({ loginError: "bad_credentials" });
           return false;
         }
-        return get().loginWithSupabase(usernameToEmail(username), password);
-      },
+        try {
+          const email = `${username.toLowerCase()}@mizan.local`;
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (!error) {
+            await useAuth.getState().hydrateFromSupabase();
+          }
+        } catch {
+          // ignore — offline mode
+        }
 
-      loginWithSupabase: async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: usernameToEmail(email),
-          password,
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+          current_password: currentPassword,
         });
-        if (error || !data.user) {
-          set({ loginError: "bad_credentials" });
-          return false;
-        }
+        if (updateError) return false;
 
-        const hydrated = await get().hydrateFromSupabase();
-        if (!hydrated) {
-          await supabase.auth.signOut();
-          set({ user: null, loginError: "no_membership" });
-          return false;
-        }
-
-        // Super admins are platform owners — they do not consume tenant seats.
-        if (hydrated.isSuperAdmin) {
-          set({ loginError: null });
-          return true;
-        }
-
-        // Device/seat gate is a local UX guard on top of Supabase Auth + RLS.
-        const lic = useLicense.getState();
-        lic.initIfNeeded();
-        const res = lic.acquireSeat(hydrated.name, hydrated.role);
-        if (!res.ok) {
-          await supabase.auth.signOut();
-          set({ user: null, loginError: res.reason ?? "invalid" });
-          return false;
-        }
-        set({ user: { ...hydrated, seatId: res.seatId }, loginError: null });
+        // A password change is a credential-security event: revoke refresh-token
+        // sessions on every device and force a fresh login.
+        await supabase.auth.signOut({ scope: "global" });
+        const current = get().user;
+        if (current?.seatId) useLicense.getState().releaseSeat(current.seatId);
+        set({ user: null, loginError: null });
         return true;
       },
-
+      logout: () => {
+        const u = get().user;
+        if (u?.seatId) useLicense.getState().releaseSeat(u.seatId);
+        void supabase.auth.signOut({ scope: "local" });
+        set({ user: null, loginError: null });
+      },
       hydrateFromSupabase: async () => {
         const { data: userData } = await supabase.auth.getUser();
         const authUser = userData.user;
@@ -107,84 +73,96 @@ export const useAuth = create<AuthState>()(
           set({ user: null });
           return null;
         }
-
-        const [{ data: isSuper }, { data: profile }, { data: roles }] = await Promise.all([
+        const [
+          { data: isSuperAdmin, error: superAdminError },
+          { data: profile, error: profileError },
+        ] = await Promise.all([
           supabase.rpc("is_super_admin"),
           supabase
             .from("profiles")
-            .select("tenant_id, display_name")
-            .eq("id", authUser.id)
+            .select("tenant_id, display_name, username")
+            .eq("id", user.id)
             .maybeSingle(),
-          supabase.from("user_roles").select("role, tenant_id").eq("user_id", authUser.id),
         ]);
+        if (superAdminError) throw superAdminError;
+        if (profileError) throw profileError;
+        const { data: roles, error: roleError } = await supabase
 
-        const isSuperAdmin = isSuper === true;
-        const tenantId = profile?.tenant_id ?? undefined;
-        const dbRole = (roles ?? []).find((r) => r.tenant_id && r.tenant_id === tenantId)?.role;
-        const role = mapDbRole(dbRole);
+        const isSuperAdmin = (roles ?? []).some((r) => r.role === "super_admin");
+        const tenantRole = (roles ?? []).find(
+          (r) => r.tenant_id && r.tenant_id === profile?.tenant_id,
+        )?.role;
 
-        // A non-super-admin must be a member of exactly one tenant with a
-        // valid operational role, otherwise there is no data they may see.
-        if (!isSuperAdmin && (!tenantId || !role)) {
-          set({ user: null });
-          return null;
-        }
+        // Map DB roles → legacy role IDs
+        let role: Role = "admin";
+        if (tenantRole === "reader") role = "reader";
+        else if (tenantRole === "collector") role = "cashier";
+        else if (tenantRole === "manager") role = "admin";
 
-        let tenantName: string | undefined;
-        if (tenantId) {
-          const { data: tenant } = await supabase
-            .from("tenants")
-            .select("name, project_name")
-            .eq("id", tenantId)
-            .maybeSingle();
-          tenantName = tenant?.project_name ?? tenant?.name ?? undefined;
-        }
-
-        const next: AuthUser = {
-          name: profile?.display_name ?? authUser.email?.split("@")[0] ?? "مستخدم",
-          role: role ?? "admin",
-          userId: authUser.id,
-          tenantId,
-          tenantName,
-          isSuperAdmin,
-        };
-        set({ user: next, loginError: null });
-        return next;
+        set({
+          user: {
+            name: profile?.display_name ?? user.email ?? "مستخدم",
+            role,
+            userId: user.id,
+            tenantId: profile?.tenant_id ?? undefined,
+            isSuperAdmin,
+          },
+          loginError: null,
+        });
       },
-
-      logout: async () => {
-        const u = get().user;
-        if (u?.seatId) useLicense.getState().releaseSeat(u.seatId);
-        set({ user: null, loginError: null });
-        await supabase.auth.signOut();
-      },
-
       heartbeat: () => {
         const u = get().user;
         if (u?.seatId) useLicense.getState().touchSeat(u.seatId);
       },
     }),
-    { name: "mizan-auth-v2" },
+    { name: "mizan-auth-v4" },
   ),
 );
 
-// Labels reflect the water-utility RBAC contract.
+// The persisted Zustand snapshot is only a UI cache. Supabase Auth remains the
+// source of truth and every auth lifecycle event rehydrates the tenant/role state.
+if (typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") {
+      const current = useAuth.getState().user;
+      if (current?.seatId) useLicense.getState().releaseSeat(current.seatId);
+      useAuth.setState({ user: null, loginError: null });
+      return;
+    }
+
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      window.setTimeout(() => {
+        void useAuth
+          .getState()
+          .hydrateFromSupabase()
+          .catch(() => {
+            useAuth.setState({ user: null, loginError: "bad_credentials" });
+          });
+      }, 0);
+    }
+  });
+}
+
+function normalizedUsernameFromAuthEmail(email?: string | null): string | undefined {
+  if (!email) return undefined;
+  const suffix = "@mizan.local";
+  return email.endsWith(suffix) ? email.slice(0, -suffix.length) : undefined;
+}
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "مدير مشروع",
   reader: "قارئ عدادات",
   cashier: "محصل",
 };
-
-export function canAccess(role: Role | undefined, path: string): boolean {
+export function canAccess(role: Role | undefined, path: string, isSuperAdmin = false): boolean {
   if (!role) return false;
-  if (path.startsWith("/super-admin")) return false;
+  if (isSuperAdmin) return true;
   if (role === "admin") return true;
-  if (role === "reader") return path === "/readings";
-  if (role === "cashier") return path === "/bills" || path === "/payments";
+  if (role === "reader") return path === "/readings" || path === "/account";
+  if (role === "cashier") return path === "/bills" || path === "/payments" || path === "/account";
   return false;
 }
-
-export function defaultRouteFor(role: Role): string {
+export function defaultRouteFor(role: Role, isSuperAdmin = false): string {
+  if (isSuperAdmin) return "/super-admin";
   if (role === "reader") return "/readings";
   if (role === "cashier") return "/bills";
   return "/";

@@ -1,1 +1,4 @@
 project_id = "fpwmaxrawtskwcauvahu"
+
+[functions.whatsapp-invoice]
+verify_jwt = false

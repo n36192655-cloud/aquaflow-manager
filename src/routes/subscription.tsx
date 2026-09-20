@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useLicense, statusLabel, VENDOR_NAME, type LicenseStatus } from "@/lib/license";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,39 +18,39 @@ export const Route = createFileRoute("/subscription")({
 
 function SubscriptionPage() {
   const lic = useLicense();
+  const initIfNeeded = useLicense((s) => s.initIfNeeded);
+  const validateRemote = useLicense((s) => s.validateRemote);
+  const { user } = useAuth();
   const [currentStatus, setCurrentStatus] = useState<LicenseStatus>("active");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [showActivationForm, setShowActivationForm] = useState(false);
-
   const [formTenantId, setFormTenantId] = useState("");
   const [formKey, setFormKey] = useState("");
-  const [formSeats, setFormSeats] = useState(3); // 3 أجهزة افتراضياً للعميل الحالي
+  const [formSeats, setFormSeats] = useState(3);
 
-  // فحص حالة العميل حياً من السيرفر بمجرد فتح الشاشة
   useEffect(() => {
-    lic.initIfNeeded();
-    lic.validateRemote().then((status) => {
-      setCurrentStatus(status);
+    initIfNeeded();
+    if (user?.tenantId) void validateRemote(user.tenantId).then(setCurrentStatus);
+    let cancelled = false;
+    void supabase.rpc("is_super_admin").then(({ data, error }) => {
+      if (!cancelled) setIsAdminUnlocked(!error && data === true);
     });
-    // لوحة الصيانة تُفتح فقط لمالك المنصة عبر تحقق قاعدة البيانات (is_super_admin)
-    void supabase.rpc("is_super_admin").then(({ data }) => {
-      setIsAdminUnlocked(data === true);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [initIfNeeded, validateRemote, user?.tenantId]);
 
-  // Toggles the tenant subscription between active and suspended (super-admin only).
   async function toggleRemoteBilling() {
+    const tenantId = user?.tenantId ?? lic.tenantId;
+    if (!tenantId) return;
     try {
       const nextStatus = lic.billingPaid ? "suspended" : "active";
-      const { error } = await supabase
-        .from("tenants")
-        .update({ subscription_status: nextStatus })
-        .eq("id", lic.tenantId);
-
+      const { error } = await supabase.rpc("set_tenant_subscription_status", {
+        p_tenant_id: tenantId,
+        p_status: nextStatus,
+      });
       if (error) throw error;
-
-      await lic.validateRemote();
+      await validateRemote(tenantId);
       toast.success(
         nextStatus === "active"
           ? "تم تنشيط اشتراك المشروع سحابياً"
@@ -57,7 +58,7 @@ function SubscriptionPage() {
       );
       window.location.reload();
     } catch {
-      toast.error("فشل تعديل الحالة السحابية — تحقق من اتصال الإنترنت.");
+      toast.error("فشل تعديل الحالة السحابية — تحقق من صلاحيات المشرف واتصال الإنترنت.");
     }
   }
 
@@ -66,18 +67,14 @@ function SubscriptionPage() {
       toast.error("خطأ: يرجى إدخال البيانات كاملة.");
       return;
     }
-
     const success = await lic.activateRemote(formTenantId.trim(), formKey.trim(), formSeats);
-
     if (success) {
       toast.success("🔥 تم تفعيل المستأجر بنظام السحابة الموحدة للأجهزة المتزامنة!");
       setShowActivationForm(false);
       setFormTenantId("");
       setFormKey("");
       window.location.reload();
-    } else {
-      toast.error("حدث خطأ أثناء الاتصال بالخادم وتثبيت الترخيص.");
-    }
+    } else toast.error("حدث خطأ أثناء الاتصال بالخادم أو رفضت صلاحيات المشرف التفعيل.");
   }
 
   return (
@@ -89,11 +86,13 @@ function SubscriptionPage() {
         <div className="w-full max-w-lg space-y-4">
           <Card className="border-border shadow-xl relative overflow-hidden">
             {isAdminUnlocked && (
-              <span className="absolute top-4 left-4 text-primary/40">
+              <div
+                className="absolute top-4 left-4 text-primary/40"
+                title="Super-admin authenticated"
+              >
                 <KeyRound className="w-4 h-4" />
-              </span>
+              </div>
             )}
-
             <CardHeader className="text-center">
               <div className="mx-auto w-14 h-14 rounded-2xl grid place-items-center mb-2 bg-primary/10">
                 <Lock className="w-6 h-6 text-primary" />
@@ -105,10 +104,12 @@ function SubscriptionPage() {
                   : `${statusLabel(currentStatus)}. يرجى مراجعة مركز الصيانة.`}
               </p>
             </CardHeader>
-
             <CardContent className="space-y-5">
               <div className="grid gap-1 bg-muted/30 p-4 rounded-xl border text-sm">
-                <Row label="معرّف المستأجر الموحد" value={lic.tenantId || "غير مفعّل ⚠️"} />
+                <Row
+                  label="معرّف المستأجر الموحد"
+                  value={(user?.tenantId ?? lic.tenantId) || "غير مفعّل ⚠️"}
+                />
                 <Row
                   label="مفتاح الترخيص السحابي"
                   value={lic.licenseKey ? `•••• •••• ${lic.licenseKey.slice(-4)}` : "—"}
@@ -136,7 +137,6 @@ function SubscriptionPage() {
                 />
                 <Row label="بصمة جهازك الحالي" value={lic.currentFingerprint()} mono />
               </div>
-
               <div className="rounded-xl bg-primary/5 p-4 text-xs border border-primary/10 space-y-2.5">
                 <div className="font-bold flex items-center gap-1.5 text-primary text-sm">
                   <ShieldCheck className="w-4 h-4" /> خدمات عزل البيانات والتحكم السحابي الموحد —{" "}
@@ -151,14 +151,12 @@ function SubscriptionPage() {
                   </div>
                 </div>
               </div>
-
               {isAdminUnlocked && (
                 <div className="border-t pt-4 space-y-4 bg-amber-500/5 p-4 rounded-xl border-dashed border-amber-500/30">
                   <div className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
                     <KeyRound className="w-4 h-4" /> لوحة التحكم الفوري بالأجهزة عن بُعد (Indicatorz
                     Suite)
                   </div>
-
                   <div className="flex gap-2 flex-wrap">
                     <Button
                       size="sm"
@@ -167,13 +165,17 @@ function SubscriptionPage() {
                     >
                       {showActivationForm ? "إغلاق نموذج التفعيل" : "🚀 إنشاء رخصة سحابية لعميل"}
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={toggleRemoteBilling}>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={toggleRemoteBilling}
+                      disabled={!user?.tenantId && !lic.tenantId}
+                    >
                       {lic.billingPaid
-                        ? "🛑 إيقاف الـ 3 أجهزة فوراً عن بُعد"
+                        ? "🛑 إيقاف الأجهزة فوراً عن بُعد"
                         : "✅ إعادة تشغيل الأجهزة"}
                     </Button>
                   </div>
-
                   {showActivationForm && (
                     <div className="bg-background p-4 rounded-lg border space-y-3 shadow-inner">
                       <div className="font-bold text-xs text-primary flex items-center gap-1 border-b pb-1">
@@ -197,7 +199,7 @@ function SubscriptionPage() {
                         <Input
                           value={formKey}
                           onChange={(e) => setFormKey(e.target.value)}
-                          placeholder="مثال: KEY-3DEVICES-VALID"
+                          placeholder="أدخل مفتاح الترخيص الصادر للعميل"
                           className="h-9 text-left font-mono"
                         />
                       </div>
@@ -207,6 +209,8 @@ function SubscriptionPage() {
                         </Label>
                         <Input
                           type="number"
+                          min={1}
+                          max={10000}
                           value={formSeats}
                           onChange={(e) => setFormSeats(Number(e.target.value))}
                           className="h-9 text-left font-mono"
@@ -230,7 +234,6 @@ function SubscriptionPage() {
     </div>
   );
 }
-
 interface RowProps {
   label: string;
   value: React.ReactNode;

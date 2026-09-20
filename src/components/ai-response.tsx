@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   XCircle,
   Droplets,
-  Zap,
   TrendingUp,
   Wallet,
   Smartphone,
@@ -72,9 +71,9 @@ export function AiResponseRenderer({ response, onSuggestion }: Props) {
                 <span className="inline-flex items-center gap-1">
                   <Phone className="w-3 h-3" /> <span dir="ltr">{customer.phone}</span>
                 </span>
-                {customer.directorate && (
+                {customer.address && (
                   <span className="inline-flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> {customer.directorate}
+                    <MapPin className="w-3 h-3" /> {customer.address}
                   </span>
                 )}
               </div>
@@ -123,12 +122,6 @@ export function AiResponseRenderer({ response, onSuggestion }: Props) {
         consumed: response.water.consumed,
         loss: response.water.loss,
       },
-      {
-        name: "كهرباء",
-        produced: response.electric.produced,
-        consumed: response.electric.consumed,
-        loss: response.electric.loss,
-      },
     ];
     return (
       <Card>
@@ -136,18 +129,12 @@ export function AiResponseRenderer({ response, onSuggestion }: Props) {
           <div className="text-xs text-muted-foreground">
             الفترة: {response.range.from} → {response.range.to}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2">
             <LossCard
               label="فاقد المياه"
               pct={response.water.pct}
               loss={response.water.loss}
               icon={<Droplets className="w-4 h-4 text-water" />}
-            />
-            <LossCard
-              label="فاقد الكهرباء"
-              pct={response.electric.pct}
-              loss={response.electric.loss}
-              icon={<Zap className="w-4 h-4 text-electric" />}
             />
           </div>
           <div className="h-44">
@@ -351,11 +338,11 @@ function LossCard({
   icon,
 }: {
   label: string;
-  pct: number;
+  pct: number | null;
   loss: number;
   icon: React.ReactNode;
 }) {
-  const danger = pct > 15;
+  const danger = pct != null && pct > 15;
   return (
     <div
       className={`p-3 rounded-lg border ${danger ? "border-destructive/40 bg-destructive/5" : "bg-muted/30"}`}
@@ -365,9 +352,9 @@ function LossCard({
         {label}
       </div>
       <div className={`text-xl font-bold mt-1 ${danger ? "text-destructive" : ""}`}>
-        {pct.toFixed(1)}%
+        {pct == null ? "غير متاح" : `${pct.toFixed(1)}%`}
       </div>
-      <div className="text-[11px] text-muted-foreground">{fmtNum(loss)} وحدة فاقد</div>
+      <div className="text-[11px] text-muted-foreground">{fmtNum(loss)} م³ فرق حسابي</div>
     </div>
   );
 }

@@ -19,6 +19,11 @@ import { Route as BillsRouteImport } from './routes/bills'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuperAdminIndexRouteImport } from './routes/super-admin/index'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as MetersRouteImport } from './routes/meters'
+import { Route as TariffsRouteImport } from './routes/tariffs'
+import { Route as UpdatePasswordRouteImport } from './routes/update-password'
 
 const SubscriptionRoute = SubscriptionRouteImport.update({
   id: '/subscription',
@@ -65,6 +70,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountRoute = AccountRouteImport.update({ id: '/account', path: '/account', getParentRoute: () => rootRouteImport } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({ id: '/forgot-password', path: '/forgot-password', getParentRoute: () => rootRouteImport } as any)
+const MetersRoute = MetersRouteImport.update({ id: '/meters', path: '/meters', getParentRoute: () => rootRouteImport } as any)
+const TariffsRoute = TariffsRouteImport.update({ id: '/tariffs', path: '/tariffs', getParentRoute: () => rootRouteImport } as any)
+const UpdatePasswordRoute = UpdatePasswordRouteImport.update({ id: '/update-password', path: '/update-password', getParentRoute: () => rootRouteImport } as any)
+
 const SuperAdminIndexRoute = SuperAdminIndexRouteImport.update({
   id: '/super-admin/',
   path: '/super-admin/',
@@ -82,6 +93,11 @@ export interface FileRoutesByFullPath {
   '/readings': typeof ReadingsRoute
   '/subscription': typeof SubscriptionRoute
   '/super-admin/': typeof SuperAdminIndexRoute
+  '/account': typeof AccountRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/meters': typeof MetersRoute
+  '/tariffs': typeof TariffsRoute
+  '/update-password': typeof UpdatePasswordRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +110,11 @@ export interface FileRoutesByTo {
   '/readings': typeof ReadingsRoute
   '/subscription': typeof SubscriptionRoute
   '/super-admin': typeof SuperAdminIndexRoute
+  '/account': typeof AccountRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/meters': typeof MetersRoute
+  '/tariffs': typeof TariffsRoute
+  '/update-password': typeof UpdatePasswordRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +128,11 @@ export interface FileRoutesById {
   '/readings': typeof ReadingsRoute
   '/subscription': typeof SubscriptionRoute
   '/super-admin/': typeof SuperAdminIndexRoute
+  '/account': typeof AccountRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/meters': typeof MetersRoute
+  '/tariffs': typeof TariffsRoute
+  '/update-password': typeof UpdatePasswordRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,6 +147,11 @@ export interface FileRouteTypes {
     | '/readings'
     | '/subscription'
     | '/super-admin/'
+    | '/account'
+    | '/forgot-password'
+    | '/meters'
+    | '/tariffs'
+    | '/update-password'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -133,6 +164,11 @@ export interface FileRouteTypes {
     | '/readings'
     | '/subscription'
     | '/super-admin'
+    | '/account'
+    | '/forgot-password'
+    | '/meters'
+    | '/tariffs'
+    | '/update-password'
   id:
     | '__root__'
     | '/'
@@ -145,6 +181,11 @@ export interface FileRouteTypes {
     | '/readings'
     | '/subscription'
     | '/super-admin/'
+    | '/account'
+    | '/forgot-password'
+    | '/meters'
+    | '/tariffs'
+    | '/update-password'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -232,6 +273,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meters': {
+      id: '/meters'
+      path: '/meters'
+      fullPath: '/meters'
+      preLoaderRoute: typeof MetersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tariffs': {
+      id: '/tariffs'
+      path: '/tariffs'
+      fullPath: '/tariffs'
+      preLoaderRoute: typeof TariffsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/update-password': {
+      id: '/update-password'
+      path: '/update-password'
+      fullPath: '/update-password'
+      preLoaderRoute: typeof UpdatePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -246,6 +322,11 @@ const rootRouteChildren: RootRouteChildren = {
   ReadingsRoute: ReadingsRoute,
   SubscriptionRoute: SubscriptionRoute,
   SuperAdminIndexRoute: SuperAdminIndexRoute,
+  AccountRoute: AccountRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  MetersRoute: MetersRoute,
+  TariffsRoute: TariffsRoute,
+  UpdatePasswordRoute: UpdatePasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

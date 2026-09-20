@@ -3,9 +3,7 @@ import { persist } from "zustand/middleware";
 import { supabase } from "./supabase";
 
 export const VENDOR_NAME = "انديكيتورز للإستشارات";
-
 export type LicenseStatus = "active" | "expired" | "invalid" | "seat_limit" | "suspended";
-
 export interface Seat {
   id: string;
   user: string;
@@ -14,7 +12,6 @@ export interface Seat {
   since: string;
   lastSeen: string;
 }
-
 interface LicenseState {
   tenantId: string;
   licenseKey: string;
@@ -23,9 +20,7 @@ interface LicenseState {
   billingPaid: boolean;
   seats: Seat[];
   initialized: boolean;
-
   initIfNeeded: () => void;
-  // Synchronous local checks (used by AppShell / login for UI gating)
   validate: () => LicenseStatus;
   acquireSeat: (
     user: string,
@@ -33,12 +28,10 @@ interface LicenseState {
   ) => { ok: boolean; seatId?: string; reason?: LicenseStatus };
   releaseSeat: (seatId: string) => void;
   touchSeat: (seatId: string) => void;
-  // Cloud-backed helpers used by the subscription admin screen
-  validateRemote: () => Promise<LicenseStatus>;
+  validateRemote: (tenantId: string) => Promise<LicenseStatus>;
   activateRemote: (tenantId: string, licenseKey: string, maxSeats: number) => Promise<boolean>;
   currentFingerprint: () => string;
 }
-
 function computeFingerprint(): string {
   if (typeof window === "undefined") return "ssr";
   const parts = [
@@ -54,7 +47,6 @@ function computeFingerprint(): string {
   }
   return h.toString(16).padStart(8, "0");
 }
-
 export const useLicense = create<LicenseState>()(
   persist(
     (set, get) => ({
@@ -65,22 +57,17 @@ export const useLicense = create<LicenseState>()(
       billingPaid: true,
       seats: [],
       initialized: false,
-
       currentFingerprint: () => computeFingerprint(),
-
       initIfNeeded: () => {
-        const s = get();
-        if (s.initialized) return;
+        if (get().initialized) return;
         set({ initialized: true });
       },
-
       validate: () => {
         const s = get();
         if (!s.billingPaid) return "suspended";
         if (s.expiresAt && new Date(s.expiresAt).getTime() < Date.now()) return "expired";
         return "active";
       },
-
       acquireSeat: (user, role) => {
         const s = get();
         const status = get().validate();
@@ -95,56 +82,64 @@ export const useLicense = create<LicenseState>()(
           });
           return { ok: true, seatId: existing.id };
         }
-        if (s.seats.length >= s.maxSeats) return { ok: false, reason: "seat_limit" };
+        // Device fingerprints and browser storage are attacker-controlled. They must never
+        // enforce authorization or licensing limits. The server/RLS remains the security
+        // boundary; this local list is telemetry/UI state only.
+
+        const now = new Date().toISOString();
         const seat: Seat = {
           id: `seat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           user,
           role,
           device: fp,
-          since: new Date().toISOString(),
-          lastSeen: new Date().toISOString(),
+          since: now,
+          lastSeen: now,
         };
         set({ seats: [...s.seats, seat] });
         return { ok: true, seatId: seat.id };
       },
-
-      releaseSeat: (seatId) => {
-        set({ seats: get().seats.filter((s) => s.id !== seatId) });
-      },
-
-      touchSeat: (seatId) => {
+      releaseSeat: (seatId) => set({ seats: get().seats.filter((s) => s.id !== seatId) }),
+      touchSeat: (seatId) =>
         set({
           seats: get().seats.map((s) =>
             s.id === seatId ? { ...s, lastSeen: new Date().toISOString() } : s,
           ),
-        });
-      },
-
-      validateRemote: async () => {
-        const s = get();
-        if (!s.tenantId) return get().validate();
+        }),
+      validateRemote: async (tenantId) => {
+        const normalizedTenantId = tenantId.trim();
+        if (!normalizedTenantId) {
+          set({ billingPaid: false, expiresAt: "" });
+          return "invalid";
+        }
         try {
           const { data, error } = await supabase
             .from("tenants")
             .select("subscription_status, subscription_expires_at")
-            .eq("id", s.tenantId)
+            .eq("id", normalizedTenantId)
             .maybeSingle();
-          if (error || !data) return get().validate();
+          if (error || !data) {
+            set({ billingPaid: false, expiresAt: "" });
+            return "invalid";
+          }
+          const previousTenantId = get().tenantId;
           const expired =
             data.subscription_expires_at &&
             new Date(data.subscription_expires_at).getTime() < Date.now();
           set({
+            tenantId: normalizedTenantId,
             billingPaid: data.subscription_status === "active",
             expiresAt: data.subscription_expires_at ?? "",
+            ...(previousTenantId !== normalizedTenantId ? { seats: [] } : {}),
           });
           if (data.subscription_status === "suspended") return "suspended";
           if (data.subscription_status === "expired" || expired) return "expired";
+          if (data.subscription_status !== "active") return "invalid";
           return "active";
         } catch {
-          return get().validate();
+          set({ billingPaid: false, expiresAt: "" });
+          return "invalid";
         }
       },
-
       activateRemote: async (tenantId, licenseKey, maxSeats) => {
         try {
           const { data, error } = await supabase.rpc("activate_tenant", {
@@ -176,7 +171,6 @@ export const useLicense = create<LicenseState>()(
     { name: "mizan-cloud-license-v2" },
   ),
 );
-
 export function statusLabel(s: LicenseStatus): string {
   switch (s) {
     case "active":

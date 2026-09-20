@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import { useStore } from "@/lib/store";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { AlertTriangle, Droplets, Trash2, Camera, TrendingDown } from "lucide-react";
+import { AlertTriangle, Droplets, RefreshCw, TrendingDown } from "lucide-react";
 import { fmtNum } from "@/lib/pricing";
 import {
   BarChart,
@@ -25,94 +26,252 @@ export const Route = createFileRoute("/loss-analysis")({
   component: LossAnalysisPage,
 });
 
-const LOSS_THRESHOLD = 15; // %
+const LOSS_THRESHOLD = 15;
+
+type ProductionLog = {
+  id: string;
+  recorded_at: string;
+  source_name: string;
+  production_m3: number | string | null;
+  note: string | null;
+  capture_source: string;
+  created_by: string | null;
+  verification_status: "pending" | "approved" | "rejected";
+};
+
+type Reading = {
+  id: string;
+  consumption: number | null;
+  created_at: string;
+  verification_status: "pending" | "approved" | "rejected";
+  status: string;
+};
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
+
 function monthAgoISO() {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
   return d.toISOString().slice(0, 10);
 }
 
-function LossAnalysisPage() {
-  const { productionLogs, addProductionLog, deleteProductionLog, readings, meters } = useStore();
-  const [units, setUnits] = useState("");
-  const [note, setNote] = useState("");
-  const [photo, setPhoto] = useState<string | undefined>(undefined);
-  const fileRef = useRef<HTMLInputElement>(null);
+function endExclusiveISO(date: string) {
+  const start = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return new Date().toISOString();
+  return new Date(start.getTime() + 86400000).toISOString();
+}
 
+function LossAnalysisPage() {
+  const { user } = useAuth();
+  const [productionLogs, setProductionLogs] = useState<ProductionLog[]>([]);
+  const [units, setUnits] = useState("");
+  const [sourceName, setSourceName] = useState("");
+  const [note, setNote] = useState("");
   const [from, setFrom] = useState(monthAgoISO());
   const [to, setTo] = useState(todayISO());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [consumed, setConsumed] = useState(0);
+  const [readingCount, setReadingCount] = useState(0);
 
-  function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(String(reader.result));
-    reader.readAsDataURL(f);
-  }
+  const loadData = useCallback(async () => {
+    if (!user?.tenantId || user.isSuperAdmin) {
+      setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
+      setLoading(false);
+      return;
+    }
 
-  function submit() {
+    if (from > to) {
+      setError("تاريخ البداية يجب أن يكون قبل أو يساوي تاريخ النهاية.");
+      setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const start = new Date(`${from}T00:00:00`).toISOString();
+    const end = endExclusiveISO(to);
+
+    const [productionResult, readingsResult] = await Promise.all([
+      supabase
+        .from("water_production_logs")
+        .select(
+          "id,recorded_at,source_name,production_m3,note,capture_source,created_by,verification_status",
+        )
+        .eq("tenant_id", user.tenantId)
+        .gte("recorded_at", start)
+        .lt("recorded_at", end)
+        .order("recorded_at", { ascending: false }),
+      supabase
+        .from("water_readings")
+        .select("id,consumption,created_at,verification_status,status")
+        .eq("tenant_id", user.tenantId)
+        .eq("verification_status", "approved")
+        .eq("status", "approved")
+        .gte("created_at", start)
+        .lt("created_at", end),
+    ]);
+
+    if (productionResult.error || readingsResult.error) {
+      console.error(productionResult.error ?? readingsResult.error);
+      setError("تعذر تحميل بيانات فاقد المياه من قاعدة البيانات.");
+      setProductionLogs([]);
+      setConsumed(0);
+      setReadingCount(0);
+      setLoading(false);
+      return;
+    }
+
+    setProductionLogs((productionResult.data ?? []) as ProductionLog[]);
+    const validReadings = ((readingsResult.data ?? []) as Reading[]).filter(
+      (r) => Number.isFinite(Number(r.consumption)) && Number(r.consumption) >= 0,
+    );
+    setConsumed(validReadings.reduce((sum, r) => sum + Number(r.consumption), 0));
+    setReadingCount(validReadings.length);
+    setLoading(false);
+  }, [user?.tenantId, user?.isSuperAdmin, from, to]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  async function submit() {
+    if (!user?.tenantId || user.isSuperAdmin) {
+      toast.error("لا يوجد مشروع تشغيلي مرتبط بالحساب");
+      return;
+    }
+
     const n = Number(units);
-    if (!n || n <= 0) return toast.error("أدخل قيمة إنتاج صحيحة");
-    addProductionLog({ type: "water", units: n, note, photo, date: new Date().toISOString() });
+    const source = sourceName.trim();
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.error("أدخل قيمة إنتاج صحيحة أكبر من صفر");
+      return;
+    }
+    if (n > 100000000) {
+      toast.error("قيمة الإنتاج تتجاوز الحد التشغيلي المسموح");
+      return;
+    }
+    if (!source) {
+      toast.error("أدخل مصدر قياس الإنتاج");
+      return;
+    }
+
+    setSaving(true);
+    const clientId = crypto.randomUUID();
+    const { error: rpcError } = await supabase.rpc("record_water_production", {
+      p_source_name: source,
+      p_production_m3: n,
+      p_capture_source: "field_manual",
+      p_note: note.trim() || null,
+      p_recorded_at: new Date().toISOString(),
+      p_client_id: clientId,
+    });
+    setSaving(false);
+
+    if (rpcError) {
+      console.error(rpcError);
+      toast.error("تعذر حفظ سجل الإنتاج");
+      return;
+    }
+
     setUnits("");
+    setSourceName("");
     setNote("");
-    setPhoto(undefined);
-    if (fileRef.current) fileRef.current.value = "";
-    toast.success("تم تسجيل الإنتاج");
+    toast.success("تم تسجيل الإنتاج وإرساله للمراجعة");
+    await loadData();
   }
 
   const analytics = useMemo(() => {
-    const fromT = new Date(from).getTime();
-    const toT = new Date(to).getTime() + 24 * 3600 * 1000 - 1;
-    const inRange = (d: string) => {
-      const t = new Date(d).getTime();
-      return t >= fromT && t <= toT;
-    };
-    const waterMeters = new Set(meters.map((m) => m.id));
-    const produced = productionLogs.filter((p) => inRange(p.date)).reduce((a, b) => a + b.units, 0);
-    const consumed = readings
-      .filter((r) => waterMeters.has(r.meter_id) && inRange(r.date))
-      .reduce((a, b) => a + b.consumption, 0);
+    const produced = productionLogs
+      .filter((p) => p.verification_status === "approved")
+      .map((p) => Number(p.production_m3))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .reduce((sum, value) => sum + value, 0);
     const loss = Math.max(0, produced - consumed);
     const pct = produced > 0 ? (loss / produced) * 100 : 0;
-    return { produced, consumed, loss, pct };
-  }, [productionLogs, readings, meters, from, to]);
+    return { produced, loss, pct };
+  }, [productionLogs, consumed]);
 
   const chartData = [
     {
       name: "المياه (م³)",
       produced: analytics.produced,
-      consumed: analytics.consumed,
+      consumed,
       loss: analytics.loss,
     },
   ];
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">تحليل فاقد المياه والتسرب</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          قياس الفرق بين إنتاج المياه من المصدر واستهلاك المشتركين
-        </p>
+  if (!user?.tenantId || user.isSuperAdmin) {
+    return (
+      <div dir="rtl">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h1 className="font-bold">لا يوجد مشروع تشغيلي مرتبط بالحساب</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              لا يتم عرض بيانات اصطناعية أو بيانات مشروع آخر.
+            </p>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
+
+  return (
+    <div dir="rtl" className="space-y-6 pb-8">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <Badge variant="outline" className="mb-2">
+            بيانات قاعدة البيانات
+          </Badge>
+          <h1 className="text-2xl md:text-3xl font-bold">تحليل فاقد المياه والتسرب</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            الفرق بين مدخل المياه المعتمد والاستهلاك المعتمد للمشروع الحالي.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => void loadData()} disabled={loading || saving}>
+          <RefreshCw className={`h-4 w-4 ms-1 ${loading ? "animate-spin" : ""}`} /> تحديث
+        </Button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">تسجيل إنتاج مياه جديد</CardTitle>
+            <CardTitle className="text-base">تسجيل مدخل مياه جديد</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <Label>إجمالي الوحدات (م³)</Label>
+              <Label>مصدر القياس</Label>
+              <Input
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                placeholder="مثال: عداد الإنتاج الرئيسي"
+                disabled={saving}
+              />
+            </div>
+            <div>
+              <Label>حجم الإنتاج/الضخ (م³)</Label>
               <Input
                 type="number"
+                min="0"
+                step="0.001"
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
                 placeholder="مثال: 12500"
+                disabled={saving}
               />
             </div>
             <div>
@@ -120,29 +279,15 @@ function LossAnalysisPage() {
               <Input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="مثال: قراءة عداد المضخة الرئيسية بتاريخ..."
+                placeholder="مصدر القياس أو ملاحظة التشغيل"
+                disabled={saving}
               />
             </div>
-            <div>
-              <Label>تصوير العداد الرئيسي للمياه</Label>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={onPickPhoto}
-                className="block w-full text-xs file:me-2 file:py-1.5 file:px-3 file:rounded-md file:border file:bg-muted file:text-foreground"
-              />
-              {photo && (
-                <img
-                  src={photo}
-                  alt="عداد رئيسي"
-                  className="mt-2 h-32 w-full object-cover rounded-lg border"
-                />
-              )}
+            <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+              لا يتم تخزين صورة أو Data URL لأن جدول سجلات الإنتاج الحالي لا يحتوي حقلاً للصورة.
             </div>
-            <Button onClick={submit} className="w-full">
-              <Camera className="w-4 h-4 ms-1" /> حفظ الإنتاج
+            <Button onClick={() => void submit()} className="w-full" disabled={saving}>
+              <Droplets className="w-4 h-4 ms-1" /> {saving ? "جارٍ الحفظ…" : "حفظ وإرسال للمراجعة"}
             </Button>
           </CardContent>
         </Card>
@@ -171,13 +316,35 @@ function LossAnalysisPage() {
                 icon={<Droplets className="w-4 h-4" />}
               />
             </div>
+            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+              <div>
+                مدخل معتمد:{" "}
+                <span className="font-semibold text-foreground">
+                  {fmtNum(analytics.produced)} م³
+                </span>
+              </div>
+              <div>
+                استهلاك معتمد:{" "}
+                <span className="font-semibold text-foreground">{fmtNum(consumed)} م³</span>
+              </div>
+              <div>
+                القراءات المعتمدة:{" "}
+                <span className="font-semibold text-foreground">{readingCount}</span>
+              </div>
+              <div>
+                السجلات المعتمدة:{" "}
+                <span className="font-semibold text-foreground">
+                  {productionLogs.filter((p) => p.verification_status === "approved").length}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">المُنتج مقابل المُفوتر</CardTitle>
+          <CardTitle className="text-base">مدخل المياه مقابل الاستهلاك والفاقد</CardTitle>
         </CardHeader>
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
@@ -187,23 +354,23 @@ function LossAnalysisPage() {
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v: number) => fmtNum(v)} />
               <Legend />
-              <Bar dataKey="produced" name="مُنتج" fill="var(--water)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="consumed" name="مُستهلك" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="loss" name="فاقد" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="produced" name="مدخل معتمد" fill="var(--water)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="consumed" name="استهلاك معتمد" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="loss" name="فاقد حسابي" fill="#dc2626" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {analytics.pct > LOSS_THRESHOLD && (
+      {analytics.produced > 0 && analytics.pct > LOSS_THRESHOLD && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div className="text-sm">
-              <div className="font-semibold">تنبيه ذكي — نسبة الفاقد مرتفعة</div>
+              <div className="font-semibold">تنبيه — نسبة الفاقد تتجاوز العتبة التشغيلية</div>
               <div className="text-muted-foreground mt-1">
-                فاقد المياه {analytics.pct.toFixed(1)}% — يوصى بفحص شبكة التوزيع لاحتمال وجود تسرب
-                أو استهلاك غير مُقاس.
+                الفاقد الحسابي {analytics.pct.toFixed(1)}%. يجب تفسيره ميدانياً قبل اعتباره تسرباً
+                أو فقداً فنياً.
               </div>
             </div>
           </CardContent>
@@ -212,39 +379,22 @@ function LossAnalysisPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">سجلات الإنتاج</CardTitle>
+          <CardTitle className="text-base">سجلات مدخل المياه</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {productionLogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">لا توجد سجلات بعد.</p>
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">جارٍ تحميل البيانات…</p>
+          ) : productionLogs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              لا توجد سجلات إنتاج في الفترة المحددة.
+            </p>
           ) : (
-            productionLogs
-              .slice()
-              .sort((a, b) => +new Date(b.date) - +new Date(a.date))
-              .map((p) => (
-                <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  {p.photo ? (
-                    <img src={p.photo} alt="" className="w-12 h-12 object-cover rounded" />
-                  ) : (
-                    <div className="w-12 h-12 bg-muted rounded grid place-items-center">
-                      <TrendingDown className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge>مياه</Badge>
-                      <span className="font-semibold">{fmtNum(p.units)} م³</span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(p.date).toLocaleString("ar")}
-                      </span>
-                    </div>
-                    {p.note && <div className="text-xs text-muted-foreground mt-0.5">{p.note}</div>}
+            productionLogs.map((p) => (
                   </div>
                   <Button size="icon" variant="ghost" onClick={() => deleteProductionLog(p.id)}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
-              ))
           )}
         </CardContent>
       </Card>

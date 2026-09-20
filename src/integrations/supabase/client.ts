@@ -7,6 +7,28 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
 }
 
+function isSecretSupabaseApiKey(value: string): boolean {
+  return value.startsWith("sb_secret_") || hasServiceRoleJwt(value);
+}
+
+function hasServiceRoleJwt(value: string): boolean {
+  const parts = value.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(
+      atob(
+        parts[1]
+          .replace(/-/g, "+")
+          .replace(/_/g, "/")
+          .padEnd(Math.ceil(parts[1].length / 4) * 4, "="),
+      ),
+    ) as { role?: unknown };
+    return payload.role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
   return (input, init) => {
     const headers = new Headers(
@@ -31,18 +53,31 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
+  // Use import.meta.env for client-side (Vite build-time replacement).
+  // Fall back to process.env for SSR. Keep both current publishable-key names
+  // and the legacy anon-key names so existing Vercel environments continue to work.
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
+      ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY/VITE_SUPABASE_ANON_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Configure the Supabase public client variables for this deployment.`;
+    console.error(`[Supabase] ${message}`);
+    throw new Error(message);
+  }
+
+  // A secret key must never be shipped to browser JavaScript. VITE_* values are
+  // build-time public values, so fail closed if an operator misconfigures one.
+  if (typeof window !== "undefined" && isSecretSupabaseApiKey(SUPABASE_PUBLISHABLE_KEY)) {
+    const message =
+      "Invalid Supabase client configuration: a secret key cannot be used in browser code.";
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
