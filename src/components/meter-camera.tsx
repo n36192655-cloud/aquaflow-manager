@@ -27,12 +27,6 @@ export interface OcrResult {
   readingCandidates: number;
 }
 
-export interface MeterProfileSpec {
-  integerDigits: number;
-  decimalDigits: number;
-  registerOrder: string;
-}
-
 interface Props {
   open: boolean;
   onClose: () => void;

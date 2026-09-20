@@ -41,7 +41,7 @@ const NAV: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { user, logout, heartbeat, hydrateFromSupabase } = useAuth();
+  const { user, logout, heartbeat } = useAuth();
   const online = useOnlineStatus();
   const license = useLicense();
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -177,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="relative w-9 h-9 rounded-xl grid place-items-center bg-water">
               <Droplets className="w-5 h-5 text-white" />
             </div>
-            <div className="min-w-0">
+            <div>
               <div className="text-lg font-bold tracking-tight">ميزان</div>
               <div className="text-[11px] text-sidebar-foreground/70">
                 منصة ميزان لإستدامة خدمات المياه
@@ -195,14 +195,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">{renderNav()}</nav>
         <div className="px-4 py-4 border-t border-sidebar-border space-y-2">
-          {user.isSuperAdmin && (
-            <Link
-              to="/super-admin"
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
-            >
-              <ShieldCheck className="w-3 h-3" /> لوحة مالك المنصة
-            </Link>
-          )}
           <div className="text-xs">
             <div className="font-semibold">{user.name}</div>
             <div className="text-sidebar-foreground/60">

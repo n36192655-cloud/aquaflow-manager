@@ -11,7 +11,10 @@ import { ShieldCheck, RefreshCw, LogOut, Network, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/super-admin/")({
   head: () => ({
+    meta: [
       { title: "لوحة الإشراف المركزي — ميزان" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
   }),
   component: SuperAdminDashboard,
 });
@@ -231,7 +234,9 @@ function SuperAdminDashboard() {
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <ShieldCheck className="w-6 h-6 text-primary" /> الإشراف المركزي — ميزان
             </h1>
+            <p className="text-sm text-muted-foreground mt-1">
               مراقبة وإدارة جميع مشاريع المياه دون خلط بيانات المستأجرين.
+            </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ml-2 ${loading ? "animate-spin" : ""}`} /> تحديث
@@ -360,7 +365,8 @@ function SuperAdminDashboard() {
                   <div className="font-semibold">{t.name}</div>
                   <div className="text-xs text-muted-foreground">
                     المستأجر المركزي: {t.parent_tenant_id ? "مرتبط" : "غير مرتبط"}
-                  <div className="text-xs text-muted-foreground mt-0.5">
+                  </div>
+                  <div className="text-xs text-muted-foreground">
                     ينتهي:{" "}
                     {t.subscription_expires_at
                       ? new Date(t.subscription_expires_at).toLocaleDateString("ar-YE")
