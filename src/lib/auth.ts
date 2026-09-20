@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useLicense, type LicenseStatus } from "./license";
 import { supabase } from "./supabase";
+import { loginWithUsername as loginWithUsernameServer } from "./account.functions";
 
 export type Role = "admin" | "reader" | "cashier";
 export interface AuthUser {
@@ -35,7 +36,9 @@ export const useAuth = create<AuthState>()(
           return false;
         }
         try {
-          const authResult = await loginWithUsername(normalizedUsername, password);
+          const authResult = await loginWithUsernameServer({
+            data: { username: normalizedUsername, password },
+          });
           if (!authResult?.access_token || !authResult.refresh_token) {
             set({ loginError: "bad_credentials" });
             return false;
@@ -195,18 +198,6 @@ function normalizedUsernameFromAuthEmail(email?: string | null): string | undefi
   const suffix = "@mizan.local";
   return email.endsWith(suffix) ? email.slice(0, -suffix.length) : undefined;
 }
-async function loginWithUsername(username: string, password: string) {
-  const email = username.endsWith("@mizan.local")
-    ? username
-    : username + "@mizan.local";
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (error || !data.session) return null;
-  return data.session;
-}
-
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "مدير مشروع",
   reader: "قارئ عدادات",
