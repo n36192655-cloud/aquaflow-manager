@@ -183,10 +183,14 @@ function SubscriptionGuard({ children }: { children: ReactNode }) {
         }
 
         if (alive) setState("ok");
-      } catch {
+      } catch (error) {
+        console.error("[Mizan] subscription guard check failed", error);
+        // A stale/broken Supabase session must never lock the public entry point.
+        // Clear only the local auth session and let AppShell return the user to /login.
+        await supabase.auth.signOut({ scope: "local" });
         if (alive) {
           setReason(null);
-          setState("locked");
+          setState("ok");
         }
       }
     };
