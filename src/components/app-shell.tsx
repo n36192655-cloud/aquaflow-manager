@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       navigate({ to: "/subscription", replace: true });
   }, [pathname, navigate, user?.isSuperAdmin, remoteLicenseStatus]);
   useEffect(() => {
-    if (pathname === "/login") return;
+    if (pathname === "/login" || pathname === "/admin-recovery") return;
     if (!user) {
       navigate({ to: "/login", replace: true });
       return;
@@ -124,7 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => clearInterval(timer);
   }, [user?.seatId, heartbeat]);
 
-  if (pathname === "/login" || !user) return <>{children}</>;
+  if (pathname === "/login" || pathname === "/admin-recovery" || !user) return <>{children}</>;
   if (!user.isSuperAdmin && remoteLicenseStatus === null && pathname !== "/subscription")
     return (
       <div className="min-h-screen grid place-items-center bg-background text-foreground">
