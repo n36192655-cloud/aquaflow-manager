@@ -124,6 +124,20 @@ export const loginWithUsername = createServerFn({ method: "POST" })
     };
   });
 
+
+export const createProjectTenantForCentral = createServerFn({ method: "POST" })
+  .validator(z.object({ name: z.string().trim().min(2).max(160) }))
+  .handler(async ({ data }) => {
+    const accessToken = bearerToken();
+    if (!accessToken) throw new Error("Unauthorized");
+    const { userId: actorId } = await requireProvisioningActor(accessToken);
+    const userClient = createUserSupabaseClient(accessToken);
+    const { data: tenantId, error } = await userClient.rpc("create_project_tenant", { _name: data.name });
+    if (error || !tenantId) throw new Error(error?.message ?? "Project creation failed");
+    const result = await provisionTenantUsers({ data: { tenantId } });
+    return { tenantId, credentials: result.credentials, actorId };
+  });
+
 export const provisionTenantUsers = createServerFn({ method: "POST" })
   .validator(z.object({ tenantId: z.string().uuid() }))
   .handler(async ({ data }) => {
