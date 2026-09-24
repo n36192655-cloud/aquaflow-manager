@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Droplets, RefreshCw, Wallet, Waves } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Droplets, RefreshCw, Wallet, Waves, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+import { createProjectTenantForCentral } from "@/lib/account.functions";
 
 type ProjectMetric = {
   tenant_id: string;
@@ -32,6 +33,8 @@ export function CentralDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
