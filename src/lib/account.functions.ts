@@ -21,6 +21,13 @@ const CredentialsSchema = z.object({
 });
 
 const AUTH_FAILURE_DELAY_MS = 250;
+
+async function tokenDigest(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function requireProvisioningActor(accessToken: string) {
   const userClient = createUserSupabaseClient(accessToken);
   const { data: userData, error: userError } = await userClient.auth.getUser();
@@ -303,6 +310,63 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       password,
       role: membership.role,
     };
+  });
+
+export const completeOwnerPasswordRecovery = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      token: z.string().min(32).max(128),
+      password: z
+        .string()
+        .min(16)
+        .max(128)
+        .regex(/[A-Z]/, "Password must contain an uppercase letter")
+        .regex(/[a-z]/, "Password must contain a lowercase letter")
+        .regex(/[0-9]/, "Password must contain a number")
+        .regex(/[^A-Za-z0-9]/, "Password must contain a symbol"),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const secret = createSecretSupabaseClient();
+    const digest = await tokenDigest(data.token);
+
+    const allowed = await authRateAllowed(secret, "owner-recovery-token", digest, 5);
+    if (!allowed) throw new Error("recovery_unavailable");
+
+    const { data: claimedUserId, error: claimError } = await secret.rpc(
+      "claim_owner_recovery_token",
+      { p_token_digest: digest },
+    );
+    if (claimError || !claimedUserId) throw new Error("recovery_unavailable");
+
+    const { data: authUser, error: userError } = await secret.auth.admin.getUserById(claimedUserId);
+    if (userError || !authUser.user || authUser.user.id !== "e8c3c3ad-1404-444b-8096-59770a15a82e") {
+      throw new Error("recovery_unavailable");
+    }
+
+    const { error: updateError } = await secret.auth.admin.updateUserById(claimedUserId, {
+      password: data.password,
+    });
+    if (updateError) throw new Error("recovery_unavailable");
+
+    const { error: roleError } = await secret
+      .from("user_roles")
+      .update({ must_change_password: false })
+      .eq("user_id", claimedUserId)
+      .eq("role", "super_admin");
+    if (roleError) throw new Error("recovery_lifecycle_update_failed");
+
+    const { error: auditError } = await secret.from("audit_logs").insert({
+      tenant_id: null,
+      user_id: claimedUserId,
+      action: "super_admin.password_recovered",
+      entity: "auth_user",
+      entity_id: claimedUserId,
+      meta: { one_time_recovery_token: true },
+    });
+    if (auditError) throw new Error("recovery_audit_failed");
+
+    return { ok: true };
   });
 
 export const requestPasswordReset = createServerFn({ method: "POST" })
