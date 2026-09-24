@@ -239,7 +239,7 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
     const accessToken = bearerToken();
     if (!accessToken) throw new Error("Unauthorized");
 
-    const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
+    const { userId: actorId, admin, centralTenantId } = await requireProvisioningActor(accessToken);
     const userClient = createUserSupabaseClient(accessToken);
 
     const { data: membership, error: membershipError } = await userClient
@@ -250,6 +250,22 @@ export const resetTenantUserPassword = createServerFn({ method: "POST" })
       .in("role", ["manager", "collector", "reader"])
       .maybeSingle();
     if (membershipError || !membership) throw new Error("Invalid tenant user");
+    if (centralTenantId) {
+      const { data: targetTenant, error: targetTenantError } = await userClient
+        .from("tenants")
+        .select("id,tenant_type,parent_tenant_id,subscription_status")
+        .eq("id", data.tenantId)
+        .maybeSingle();
+      if (
+        targetTenantError ||
+        !targetTenant ||
+        targetTenant.tenant_type !== "project" ||
+        targetTenant.parent_tenant_id !== centralTenantId ||
+        targetTenant.subscription_status !== "active"
+      ) {
+        throw new Error("Tenant outside actor scope");
+      }
+    }
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
