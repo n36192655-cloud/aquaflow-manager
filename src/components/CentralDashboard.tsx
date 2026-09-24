@@ -35,6 +35,7 @@ export function CentralDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [credentials, setCredentials] = useState<Array<{ username: string; password: string; role: string; displayName: string }>>([]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
