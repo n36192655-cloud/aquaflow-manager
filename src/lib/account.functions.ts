@@ -21,6 +21,22 @@ const CredentialsSchema = z.object({
 });
 
 const AUTH_FAILURE_DELAY_MS = 250;
+async function requireProvisioningActor(accessToken: string) {
+  const userClient = createUserSupabaseClient(accessToken);
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  if (userError || !userData.user) throw new Error("Unauthorized");
+  const { data: isSuperAdmin, error: superError } = await userClient.rpc("is_super_admin");
+  if (superError) throw new Error("Authorization check failed");
+  if (isSuperAdmin === true) return { userId: userData.user.id, admin: createSecretSupabaseClient() };
+  const { data: role, error: roleError } = await userClient
+    .from("user_roles").select("tenant_id,role").eq("user_id", userData.user.id).eq("role","manager").limit(1).maybeSingle();
+  if (roleError || !role?.tenant_id) throw new Error("Forbidden");
+  const { data: central, error: centralError } = await userClient
+    .from("tenants").select("id,tenant_type,subscription_status").eq("id",role.tenant_id).maybeSingle();
+  if (centralError || central?.tenant_type !== "central" || central.subscription_status !== "active") throw new Error("Forbidden");
+  return { userId: userData.user.id, centralTenantId: role.tenant_id, admin: createSecretSupabaseClient() };
+}
+
 
 async function opaqueRateKey(kind: string, value: string): Promise<string> {
   const input = new TextEncoder().encode(`mizan-auth-rate-v1:${kind}:${value}`);
@@ -114,12 +130,12 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
     const accessToken = bearerToken();
     if (!accessToken) throw new Error("Unauthorized");
 
-    const { userId: actorId, admin } = await requireSuperAdmin(accessToken);
+    const { userId: actorId, admin, centralTenantId } = await requireProvisioningActor(accessToken);
     const userClient = createUserSupabaseClient(accessToken);
 
     const { data: tenant, error: tenantError } = await userClient
       .from("tenants")
-      .select("id,name,tenant_type,subscription_status")
+      .select("id,name,tenant_type,subscription_status,parent_tenant_id")
       .eq("id", data.tenantId)
       .maybeSingle();
 
@@ -127,6 +143,7 @@ export const provisionTenantUsers = createServerFn({ method: "POST" })
       throw new Error("Invalid tenant");
     }
     if (tenant.subscription_status !== "active") throw new Error("Tenant is not active");
+    if (centralTenantId && tenant.tenant_type === "project" && tenant.parent_tenant_id !== centralTenantId) throw new Error("Tenant outside actor scope");
 
     const roles = [
       { role: "manager" as const, displayName: "مدير المشروع" },
